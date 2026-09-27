@@ -11,4 +11,6 @@ export const env = {
   workerMode: process.env.WORKER_MODE || "in-process",
   taskConcurrency: parseInt(process.env.TASK_CONCURRENCY || "3", 10),
   taskMaxAttempts: parseInt(process.env.TASK_MAX_ATTEMPTS || "2", 10),
+  allowedOrigin: process.env.ALLOWED_ORIGIN || "",
+  adminToken: process.env.ADMIN_TOKEN || "scoutflow-secret-token",
 };

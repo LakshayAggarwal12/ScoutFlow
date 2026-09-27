@@ -19,13 +19,26 @@ export async function saveWorkflow(taskId, definition) {
   });
 }
 
-export async function getWorkflowForTask(taskId) {
+export async function getWorkflowForTask(taskId, version) {
+  const where = { taskId };
+  if (version) where.version = version;
   const workflow = await prisma.workflow.findFirst({
-    where: { taskId },
+    where,
     orderBy: { version: "desc" },
   });
   if (!workflow) throw new AppError("No workflow found for this task", 404);
   return workflow;
+}
+
+// Powers "revisit previous workflows" — every rerun of a task creates a new
+// workflow version rather than overwriting the last one, so the plan the AI
+// generated for an earlier run stays inspectable.
+export async function listWorkflowVersions(taskId) {
+  return prisma.workflow.findMany({
+    where: { taskId },
+    orderBy: { version: "desc" },
+    select: { id: true, version: true, status: true, createdAt: true },
+  });
 }
 
 export async function markWorkflowStatus(id, status) {

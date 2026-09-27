@@ -1,16 +1,23 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { listTasks } from "../api/client.js";
+import { listTasks, deleteTask } from "../api/client.js";
+import { useToast } from "../context/ToastContext.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import { SkeletonList } from "../components/Skeleton.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import ErrorState from "../components/ErrorState.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
+
+const ACTIVE_STATUSES = ["PLANNING", "QUEUED", "RUNNING"];
 
 export default function History() {
+  const { notify } = useToast();
   const [statusFilter, setStatusFilter] = useState("");
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   function load() {
     setLoading(true);
@@ -22,6 +29,20 @@ export default function History() {
   }
 
   useEffect(load, [statusFilter]);
+
+  async function confirmDelete() {
+    setDeleting(true);
+    try {
+      await deleteTask(pendingDelete.id);
+      notify("Task deleted", "success");
+      setPendingDelete(null);
+      load();
+    } catch (err) {
+      notify(err.response?.data?.error || err.message, "error");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="p-8 max-w-4xl animate-fade-in">
@@ -60,12 +81,32 @@ export default function History() {
                   <Link to={`/tasks/${task.id}`} className="btn-secondary px-3 py-1.5">
                     Open
                   </Link>
+                  {!ACTIVE_STATUSES.includes(task.status) && (
+                    <button
+                      className="text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-colors duration-150 text-sm w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-50 dark:hover:bg-red-950/30"
+                      title="Delete task"
+                      onClick={() => setPendingDelete(task)}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete this task?"
+        description={pendingDelete ? `"${pendingDelete.prompt}" and its dataset/history will be permanently removed.` : ""}
+        confirmLabel="Delete"
+        danger
+        loading={deleting}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

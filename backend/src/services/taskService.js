@@ -4,11 +4,11 @@ import { AppError } from "../utils/AppError.js";
 const ACTIVE_STATUSES = ["PLANNING", "QUEUED", "RUNNING"];
 const TERMINAL_STATUSES = ["COMPLETED", "FAILED", "CANCELLED"];
 
-export async function createTask(prompt) {
+export async function createTask(prompt, userId = null) {
   if (!prompt || !prompt.trim()) {
     throw new AppError("prompt is required", 422);
   }
-  return prisma.task.create({ data: { prompt: prompt.trim(), status: "DRAFT" } });
+  return prisma.task.create({ data: { prompt: prompt.trim(), status: "DRAFT", userId } });
 }
 
 export async function getTask(id) {
@@ -17,9 +17,12 @@ export async function getTask(id) {
   return task;
 }
 
-export async function listTasks({ page = 1, limit = 20, status } = {}) {
+export async function listTasks({ page = 1, limit = 20, status, userId } = {}) {
   const skip = (page - 1) * limit;
-  const where = status ? { status } : {};
+  const where = {};
+  if (status) where.status = status;
+  if (userId) where.userId = userId;
+  
   const [items, total] = await Promise.all([
     prisma.task.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: limit }),
     prisma.task.count({ where }),

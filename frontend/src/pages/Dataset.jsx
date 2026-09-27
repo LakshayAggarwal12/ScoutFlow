@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getRecords, getDatasetVersions, exportCsvUrl, exportJsonUrl } from "../api/client.js";
+import { getRecords, getDatasetVersions, exportCsvUrl, exportJsonUrl, exportXlsxUrl } from "../api/client.js";
 import StatusBadge from "../components/StatusBadge.jsx";
 import MockDataBadge from "../components/MockDataBadge.jsx";
 import { SkeletonTable } from "../components/Skeleton.jsx";
@@ -80,8 +80,11 @@ export default function Dataset() {
           <a href={exportCsvUrl(id)} className="btn-secondary" download>
             Export CSV
           </a>
-          <a href={exportJsonUrl(id)} className="btn-primary" download>
+          <a href={exportJsonUrl(id)} className="btn-secondary" download>
             Export JSON
+          </a>
+          <a href={exportXlsxUrl(id)} className="btn-primary" download>
+            Export XLSX
           </a>
         </div>
       </div>

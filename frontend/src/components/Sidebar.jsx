@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext.jsx";
+import Logo from "./Logo.jsx";
 
 const links = [
   { to: "/", label: "Dashboard", end: true },
@@ -15,9 +16,12 @@ export default function Sidebar() {
   return (
     <aside className="w-60 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 min-h-screen flex flex-col transition-colors duration-200">
       <div className="px-5 py-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold tracking-tight">AI Data Intelligence</p>
-          <p className="text-xs text-slate-400 mt-0.5">MVP</p>
+        <div className="flex items-center gap-2.5">
+          <Logo />
+          <div>
+            <p className="text-sm font-semibold tracking-tight leading-none">ScoutFlow</p>
+            <p className="text-[11px] text-slate-400 mt-1">AI Data Intelligence</p>
+          </div>
         </div>
         <button
           onClick={toggleTheme}

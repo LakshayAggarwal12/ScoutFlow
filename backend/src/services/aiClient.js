@@ -1,7 +1,7 @@
 import axios from "axios";
 import { env } from "../config/env.js";
 
-const client = axios.create({ baseURL: env.aiServiceUrl, timeout: 15000 });
+const client = axios.create({ baseURL: env.aiServiceUrl, timeout: 60000 });
 
 export async function parseRequirement(prompt) {
   const { data } = await client.post("/ai/parse-requirement", { prompt });

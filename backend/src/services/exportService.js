@@ -1,9 +1,13 @@
 import { Parser } from "json2csv";
+import * as XLSX from "xlsx";
 import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/AppError.js";
 
-async function loadLatestDatasetRecords(taskId) {
-  const dataset = await prisma.dataset.findFirst({ where: { taskId }, orderBy: { version: "desc" } });
+async function loadLatestDatasetRecords(taskId, version) {
+  const where = { taskId };
+  if (version) where.version = parseInt(version, 10);
+
+  const dataset = await prisma.dataset.findFirst({ where, orderBy: { version: "desc" } });
   if (!dataset) throw new AppError("No dataset found for this task", 404);
 
   const records = await prisma.record.findMany({
@@ -15,24 +19,27 @@ async function loadLatestDatasetRecords(taskId) {
   return { dataset, records };
 }
 
-export async function exportDatasetCsv(taskId) {
-  const { records } = await loadLatestDatasetRecords(taskId);
-
-  const rows = records.map((r) => ({
+function buildRows(records) {
+  return records.map((r) => ({
     ...r.data,
     validation_status: r.validationStatus,
+    confidence: r.confidence ?? 1,
     source_url: r.source?.url || "",
-    collected_at: r.source?.createdAt?.toISOString() || "",
+    source_type: r.source?.type || "",
+    collected_at: r.source?.createdAt?.toISOString() || r.createdAt?.toISOString() || "",
   }));
+}
 
+export async function exportDatasetCsv(taskId, version) {
+  const { records } = await loadLatestDatasetRecords(taskId, version);
+  const rows = buildRows(records);
   if (rows.length === 0) return "";
   const parser = new Parser();
   return parser.parse(rows);
 }
 
-export async function exportDatasetJson(taskId) {
-  const { dataset, records } = await loadLatestDatasetRecords(taskId);
-
+export async function exportDatasetJson(taskId, version) {
+  const { dataset, records } = await loadLatestDatasetRecords(taskId, version);
   return {
     dataset: {
       id: dataset.id,
@@ -44,8 +51,32 @@ export async function exportDatasetJson(taskId) {
       ...r.data,
       validation_status: r.validationStatus,
       validation_errors: r.validationErrors || [],
+      confidence: r.confidence ?? 1,
       source_url: r.source?.url || null,
-      collected_at: r.source?.createdAt || null,
+      source_type: r.source?.type || null,
+      collected_at: r.source?.createdAt || r.createdAt || null,
     })),
   };
+}
+
+export async function exportDatasetXlsx(taskId, version) {
+  const { dataset, records } = await loadLatestDatasetRecords(taskId, version);
+  const rows = buildRows(records);
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ note: "No records" }]);
+  XLSX.utils.book_append_sheet(wb, ws, "Records");
+
+  // Second sheet: dataset metadata
+  const meta = [
+    { field: "dataset_id", value: dataset.id },
+    { field: "version", value: dataset.version },
+    { field: "used_mock_data", value: String(dataset.usedMockData) },
+    { field: "created_at", value: dataset.createdAt?.toISOString() || "" },
+    { field: "record_count", value: records.length },
+  ];
+  const wsMeta = XLSX.utils.json_to_sheet(meta);
+  XLSX.utils.book_append_sheet(wb, wsMeta, "Metadata");
+
+  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 }

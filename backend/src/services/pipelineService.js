@@ -76,7 +76,12 @@ export async function runPipeline(task, sources, { usedMockData = false } = {}) 
     if (status === "VALID") stats.valid += 1;
     else if (status === "INVALID") stats.invalid += 1;
     else stats.partial += 1;
-    return { ...item, status, errors };
+    
+    let confidence = 1.0;
+    if (status === "INVALID") confidence = 0.0;
+    else if (status === "PARTIAL") confidence = Math.max(0.1, 1.0 - (errors.length * 0.2));
+
+    return { ...item, status, errors, confidence };
   });
   await logStep(task.id, "VALIDATION", "COMPLETED", `${stats.valid} valid, ${stats.partial} partial, ${stats.invalid} invalid`);
 
@@ -90,6 +95,7 @@ export async function runPipeline(task, sources, { usedMockData = false } = {}) 
       data: item.normalized,
       validationStatus: item.status,
       validationErrors: item.errors.length ? item.errors : undefined,
+      confidence: item.confidence,
       dedupeKey: item.dedupeKey,
     }));
 

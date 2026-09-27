@@ -1,5 +1,5 @@
 {
-  "name": "ai-data-intel-backend",
+  "name": "scoutflow-backend",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -21,6 +21,7 @@
     "ioredis": "^6.0.0",
     "json2csv": "^6.0.0-alpha.2",
     "morgan": "^1.10.0",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

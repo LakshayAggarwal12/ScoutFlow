@@ -112,7 +112,7 @@ model Record {
   createdAt        DateTime          @default(now())
 
   dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
-  source  Source? @relation(fields: [sourceId], references: [id])
+  source  Source? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
 
   @@index([datasetId])
   @@index([sourceId])

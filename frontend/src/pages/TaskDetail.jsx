@@ -1,22 +1,25 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
-import { getTask, getLogs, cancelTask, runTask, getSourceHealth } from "../api/client.js";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { getTask, getLogs, cancelTask, runTask, getSourceHealth, deleteTask } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import PipelineChecklist from "../components/PipelineChecklist.jsx";
 import { SkeletonCard } from "../components/Skeleton.jsx";
 import ErrorState from "../components/ErrorState.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 
 const ACTIVE_STATUSES = ["PLANNING", "QUEUED", "RUNNING"];
 
 export default function TaskDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { notify } = useToast();
   const [task, setTask] = useState(null);
   const [logs, setLogs] = useState([]);
   const [sourceHealth, setSourceHealth] = useState(null);
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -61,6 +64,19 @@ export default function TaskDetail() {
       notify(err.response?.data?.error || err.message, "error");
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  async function handleDelete() {
+    setActionLoading("delete");
+    try {
+      await deleteTask(id);
+      notify("Task deleted", "success");
+      navigate("/history");
+    } catch (err) {
+      notify(err.response?.data?.error || err.message, "error");
+      setActionLoading(null);
+      setConfirmDelete(false);
     }
   }
 
@@ -111,7 +127,23 @@ export default function TaskDetail() {
             View Dataset
           </Link>
         )}
+        {!isActive && (
+          <button className="btn-danger ml-auto" onClick={() => setConfirmDelete(true)}>
+            Delete
+          </button>
+        )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this task?"
+        description="This permanently removes the task, its workflow history, sources, and dataset. This can't be undone."
+        confirmLabel="Delete"
+        danger
+        loading={actionLoading === "delete"}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={handleDelete}
+      />
 
       <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="card p-5">

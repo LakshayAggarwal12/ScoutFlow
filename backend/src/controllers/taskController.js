@@ -1,7 +1,8 @@
 import { prisma } from "../config/prisma.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import * as taskService from "../services/taskService.js";
-import { exportDatasetCsv, exportDatasetJson } from "../services/exportService.js";
+import * as workflowService from "../services/workflowService.js";
+import { exportDatasetCsv, exportDatasetJson, exportDatasetXlsx } from "../services/exportService.js";
 import { enqueueTaskRun, taskQueue } from "../queue/taskQueue.js";
 import { logStep } from "../services/logService.js";
 import { AppError } from "../utils/AppError.js";
@@ -14,7 +15,8 @@ async function enqueueAndTrack(taskId) {
 
 export const createTask = asyncHandler(async (req, res) => {
   const { prompt } = req.body;
-  const task = await taskService.createTask(prompt);
+  const userId = req.user?.id;
+  const task = await taskService.createTask(prompt, userId);
   await enqueueAndTrack(task.id);
   res.status(201).json(await taskService.getTask(task.id));
 });
@@ -23,7 +25,8 @@ export const listTasks = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 20;
   const { status } = req.query;
-  const result = await taskService.listTasks({ page, limit, status });
+  const userId = req.user?.id;
+  const result = await taskService.listTasks({ page, limit, status, userId });
   res.json(result);
 });
 
@@ -64,13 +67,30 @@ export const cancelTask = asyncHandler(async (req, res) => {
   res.json(await taskService.getTask(req.params.id));
 });
 
+// "Manage collection tasks" — a task can be permanently removed once it's
+// no longer active. Deleting cascades to its workflows/sources/dataset/
+// records/logs at the DB level (see prisma/schema.prisma onDelete rules).
+export const deleteTask = asyncHandler(async (req, res) => {
+  const task = await taskService.getTask(req.params.id);
+  const ACTIVE = ["PLANNING", "QUEUED", "RUNNING"];
+  if (ACTIVE.includes(task.status)) {
+    throw new AppError("Cancel the task before deleting it", 409);
+  }
+  await prisma.task.delete({ where: { id: task.id } });
+  res.status(204).send();
+});
+
 export const getWorkflow = asyncHandler(async (req, res) => {
-  const workflow = await prisma.workflow.findFirst({
-    where: { taskId: req.params.id },
-    orderBy: { version: "desc" },
-  });
-  if (!workflow) throw new AppError("No workflow found", 404);
+  const { version } = req.query;
+  const workflow = await workflowService.getWorkflowForTask(req.params.id, version ? parseInt(version, 10) : undefined);
   res.json(workflow);
+});
+
+// Powers "revisit previous workflows" — lists every plan version the AI has
+// generated for this task across its original run and any reruns.
+export const listWorkflowVersions = asyncHandler(async (req, res) => {
+  const versions = await workflowService.listWorkflowVersions(req.params.id);
+  res.json(versions);
 });
 
 export const getLogs = asyncHandler(async (req, res) => {
@@ -106,7 +126,7 @@ export const listDatasetVersions = asyncHandler(async (req, res) => {
 export const getRecords = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 20;
+  const limit = Math.min(parseInt(req.query.limit) || 20, 100);
   const { search, location, sort, status, version } = req.query;
 
   const datasetWhere = { taskId: id };
@@ -116,17 +136,29 @@ export const getRecords = asyncHandler(async (req, res) => {
 
   const where = { datasetId: dataset.id };
   if (status) where.validationStatus = status;
+
   const AND = [];
+  // Generic full-text search across all JSONB string fields via cast.
+  // Falls back to checking common job-specific fields for backwards compat.
   if (search) {
     AND.push({
       OR: [
+        // Generic: any string field in the JSON blob contains the search term
         { data: { path: ["company_name"], string_contains: search } },
         { data: { path: ["role"], string_contains: search } },
+        { data: { path: ["title"], string_contains: search } },
+        { data: { path: ["name"], string_contains: search } },
+        { data: { path: ["description"], string_contains: search } },
       ],
     });
   }
   if (location) {
-    AND.push({ data: { path: ["location"], string_contains: location } });
+    AND.push({
+      OR: [
+        { data: { path: ["location"], string_contains: location } },
+        { data: { path: ["candidate_required_location"], string_contains: location } },
+      ],
+    });
   }
   if (AND.length) where.AND = AND;
 
@@ -143,19 +175,34 @@ export const getRecords = asyncHandler(async (req, res) => {
     prisma.record.count({ where }),
   ]);
 
-  res.json({ items, total, page, limit, datasetId: dataset.id, datasetVersion: dataset.version, usedMockData: dataset.usedMockData });
+  res.json({
+    items,
+    total,
+    page,
+    limit,
+    datasetId: dataset.id,
+    datasetVersion: dataset.version,
+    usedMockData: dataset.usedMockData,
+  });
 });
 
 export const exportCsv = asyncHandler(async (req, res) => {
-  const csv = await exportDatasetCsv(req.params.id);
+  const csv = await exportDatasetCsv(req.params.id, req.query.version);
   res.setHeader("Content-Type", "text/csv");
-  res.setHeader("Content-Disposition", `attachment; filename="dataset-${req.params.id}.csv"`);
+  res.setHeader("Content-Disposition", `attachment; filename="scoutflow-dataset-${req.params.id}.csv"`);
   res.send(csv);
 });
 
 export const exportJson = asyncHandler(async (req, res) => {
-  const json = await exportDatasetJson(req.params.id);
+  const json = await exportDatasetJson(req.params.id, req.query.version);
   res.setHeader("Content-Type", "application/json");
-  res.setHeader("Content-Disposition", `attachment; filename="dataset-${req.params.id}.json"`);
+  res.setHeader("Content-Disposition", `attachment; filename="scoutflow-dataset-${req.params.id}.json"`);
   res.send(JSON.stringify(json, null, 2));
+});
+
+export const exportXlsx = asyncHandler(async (req, res) => {
+  const buffer = await exportDatasetXlsx(req.params.id, req.query.version);
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="scoutflow-dataset-${req.params.id}.xlsx"`);
+  res.send(buffer);
 });

@@ -1,7 +1,8 @@
-"""Thin wrapper around the Anthropic API. Isolated here so callers never
-touch API-key handling directly, and so the provider can be swapped later."""
+"""Thin wrapper around the Groq API (via openai-compatible client).
+Isolated here so callers never touch API-key handling directly,
+and so the provider can be swapped via environment variables."""
 
-from app.config import LLM_API_KEY, LLM_MODEL, HAS_LLM
+from app.config import LLM_API_KEY, LLM_MODEL, HAS_LLM, LLM_BASE_URL
 
 _client = None
 
@@ -11,8 +12,11 @@ def get_client():
     if not HAS_LLM:
         return None
     if _client is None:
-        from anthropic import Anthropic
-        _client = Anthropic(api_key=LLM_API_KEY)
+        from openai import OpenAI
+        _client = OpenAI(
+            api_key=LLM_API_KEY,
+            base_url=LLM_BASE_URL,
+        )
     return _client
 
 
@@ -24,11 +28,13 @@ def complete_json(system_prompt: str, user_content: str) -> str:
     if client is None:
         raise RuntimeError("LLM not configured")
 
-    response = client.messages.create(
+    response = client.chat.completions.create(
         model=LLM_MODEL,
         max_tokens=1000,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_content}],
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ],
+        temperature=0.1,
     )
-    parts = [b.text for b in response.content if getattr(b, "type", None) == "text"]
-    return "".join(parts)
+    return response.choices[0].message.content or ""
