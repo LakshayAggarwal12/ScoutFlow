@@ -30,7 +30,7 @@ export async function getWorkflowForTask(taskId, version) {
   return workflow;
 }
 
-// Powers "revisit previous workflows" — every rerun of a task creates a new
+// Powers "revisit previous workflows" - every rerun of a task creates a new
 // workflow version rather than overwriting the last one, so the plan the AI
 // generated for an earlier run stays inspectable.
 export async function listWorkflowVersions(taskId) {

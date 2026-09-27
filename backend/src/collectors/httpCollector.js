@@ -1,10 +1,10 @@
 import * as cheerio from "cheerio";
 import { safeGet } from "../utils/urlSafety.js";
 
-// Collector A — HTTP/Public Web Collector.
+// Collector A - HTTP/Public Web Collector.
 // Fetches a permitted public page and extracts visible text content for
 // downstream AI/rule-based extraction. Goes through safeGet() so every
-// request (and every redirect hop) is checked against the SSRF guard —
+// request (and every redirect hop) is checked against the SSRF guard -
 // this collector will refuse to fetch anything that resolves to a private,
 // loopback, or link-local address (including cloud metadata endpoints).
 export async function collectFromUrl(url, { timeoutMs = 8000 } = {}) {

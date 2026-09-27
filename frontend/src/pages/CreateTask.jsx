@@ -22,7 +22,7 @@ export default function CreateTask() {
     setError(null);
     try {
       const task = await createTask(prompt.trim());
-      notify("Task created — running now", "success");
+      notify("Task created - running now", "success");
       navigate(`/tasks/${task.id}`);
     } catch (err) {
       const message = err.response?.data?.error || err.message;

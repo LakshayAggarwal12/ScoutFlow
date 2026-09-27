@@ -71,7 +71,7 @@ export const cancelTask = asyncHandler(async (req, res) => {
   res.json(await taskService.getTask(req.params.id));
 });
 
-// "Manage collection tasks" — a task can be permanently removed once it's
+// "Manage collection tasks" - a task can be permanently removed once it's
 // no longer active. Deleting cascades to its workflows/sources/dataset/
 // records/logs at the DB level (see prisma/schema.prisma onDelete rules).
 export const deleteTask = asyncHandler(async (req, res) => {
@@ -90,7 +90,7 @@ export const getWorkflow = asyncHandler(async (req, res) => {
   res.json(workflow);
 });
 
-// Powers "revisit previous workflows" — lists every plan version the AI has
+// Powers "revisit previous workflows" - lists every plan version the AI has
 // generated for this task across its original run and any reruns.
 export const listWorkflowVersions = asyncHandler(async (req, res) => {
   const versions = await workflowService.listWorkflowVersions(req.params.id);
@@ -106,7 +106,7 @@ export const getLogs = asyncHandler(async (req, res) => {
 });
 
 // Returns the latest dataset by default; ?version=N returns a specific
-// earlier version (basic dataset versioning — each rerun of a task creates
+// earlier version (basic dataset versioning - each rerun of a task creates
 // a new Dataset row rather than overwriting the last one).
 export const getDataset = asyncHandler(async (req, res) => {
   const { version } = req.query;

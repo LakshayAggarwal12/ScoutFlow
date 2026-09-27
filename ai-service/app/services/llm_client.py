@@ -22,7 +22,7 @@ def get_client():
 
 def complete_json(system_prompt: str, user_content: str) -> str:
     """Returns the raw text of the model's response. Caller is responsible
-    for JSON-parsing and validating it — the AI service never assumes the
+    for JSON-parsing and validating it - the AI service never assumes the
     LLM's output is safe to use as-is."""
     client = get_client()
     if client is None:

@@ -56,7 +56,7 @@ export default function Workflow() {
               <option value="">Latest (v{versions[0]?.version})</option>
               {versions.map((v) => (
                 <option key={v.id} value={v.version}>
-                  v{v.version} — {new Date(v.createdAt).toLocaleDateString()}
+                  v{v.version} - {new Date(v.createdAt).toLocaleDateString()}
                 </option>
               ))}
             </select>
@@ -66,7 +66,7 @@ export default function Workflow() {
       </div>
       {versions.length > 1 && (
         <p className="text-xs text-slate-400 mt-2">
-          {versions.length} plan versions exist for this task — one per run/rerun. Revisit any earlier one above.
+          {versions.length} plan versions exist for this task - one per run/rerun. Revisit any earlier one above.
         </p>
       )}
 

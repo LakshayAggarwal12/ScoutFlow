@@ -22,11 +22,11 @@ function isPrivateIp(ip) {
     if (lower.startsWith("fe80")) return true; // link-local
     return false;
   }
-  return true; // unrecognized shape — fail closed
+  return true; // unrecognized shape - fail closed
 }
 
 // Validates a URL is safe to fetch server-side: http(s) only, and every
-// address it resolves to is a public address. This is the core SSRF guard —
+// address it resolves to is a public address. This is the core SSRF guard -
 // collectors must never let a URL (AI-suggested, user-supplied, or from a
 // third-party API) reach the internal network or cloud metadata endpoints.
 export async function assertUrlIsSafe(rawUrl) {

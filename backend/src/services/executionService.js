@@ -22,7 +22,7 @@ async function checkpoint(taskId) {
 // killed mid-write, so a cancel never leaves a half-written dataset.
 //
 // `bullJob`, when provided, lets this function tell whether the current
-// attempt is the job's last one — an error on a non-final attempt is left
+// attempt is the job's last one - an error on a non-final attempt is left
 // for BullMQ's own retry/backoff rather than being recorded as a hard
 // task failure, so a transient AI-service hiccup doesn't need a manual
 // "Retry" click.
@@ -76,7 +76,7 @@ export async function executeTask(taskId, { bullJob } = {}) {
     if (err instanceof TaskCancelledError) {
       await updateTaskStatus(taskId, "CANCELLED");
       await logStep(taskId, "TASK", "CANCELLED", "Task cancelled by user");
-      return null; // not a failure — stop quietly
+      return null; // not a failure - stop quietly
     }
 
     const attemptsMade = bullJob ? bullJob.attemptsMade + 1 : 1;
@@ -91,7 +91,7 @@ export async function executeTask(taskId, { bullJob } = {}) {
         taskId,
         "TASK",
         "RETRY_SCHEDULED",
-        `Attempt ${attemptsMade}/${maxAttempts} failed (${err.message}) — retrying`
+        `Attempt ${attemptsMade}/${maxAttempts} failed (${err.message}) - retrying`
       );
       await updateTaskStatus(taskId, "QUEUED");
     }

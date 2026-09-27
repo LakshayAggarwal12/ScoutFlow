@@ -28,7 +28,7 @@ export function requireAuth(req, res, next) {
     next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {
-      return res.status(401).json({ error: "Session expired — please log in again" });
+      return res.status(401).json({ error: "Session expired - please log in again" });
     }
     return res.status(401).json({ error: "Invalid authentication token" });
   }

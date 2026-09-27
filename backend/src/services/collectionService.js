@@ -5,8 +5,8 @@ import { logStep } from "./logService.js";
 
 // Orchestrates source discovery + retrieval for a task. Tries real,
 // permitted collectors first (multi-source: a public jobs API plus any
-// configured search provider), persists a Source row for every attempt —
-// including failed ones, so source health is visible — and only falls back
+// configured search provider), persists a Source row for every attempt -
+// including failed ones, so source health is visible - and only falls back
 // to demo data when no real collector produced anything usable. Returns
 // `usedMockData` so the dataset can be labeled honestly in the UI.
 export async function collectSources(taskId, structuredRequirement) {
@@ -27,7 +27,7 @@ export async function collectSources(taskId, structuredRequirement) {
     await logStep(taskId, "COLLECTION", "ERROR", `Remotive collector failed: ${err.message}`);
   }
 
-  // Real collector 2: configured search provider (behind an interface —
+  // Real collector 2: configured search provider (behind an interface -
   // see collectors/searchCollector.js) plus generic page fetches.
   try {
     const candidateUrls = await searchSources(
@@ -48,9 +48,9 @@ export async function collectSources(taskId, structuredRequirement) {
   let usedMockData = false;
   if (attempts.filter((a) => a.ok).length === 0) {
     // No real collector produced usable results (no provider configured,
-    // provider unreachable, etc.) — fall back to demo data rather than
+    // provider unreachable, etc.) - fall back to demo data rather than
     // failing the task, but flag the dataset as mock so the UI is honest.
-    await logStep(taskId, "COLLECTION", "RUNNING", "No real sources found — falling back to demo data");
+    await logStep(taskId, "COLLECTION", "RUNNING", "No real sources found - falling back to demo data");
     const demoItems = await collectDemo(structuredRequirement);
     demoItems.forEach((item) => attempts.push({ item, ok: true }));
     usedMockData = true;

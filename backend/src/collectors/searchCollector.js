@@ -1,7 +1,7 @@
 import axios from "axios";
 import { env } from "../config/env.js";
 
-// Collector B — Search/API Collector.
+// Collector B - Search/API Collector.
 // Behind a small provider interface so a real search/jobs API can be
 // swapped in later via environment variables without touching callers.
 export async function searchSources(query, { limit = 10 } = {}) {
@@ -9,7 +9,7 @@ export async function searchSources(query, { limit = 10 } = {}) {
   const apiKey = process.env.SEARCH_API_KEY;
 
   if (!provider || !apiKey) {
-    // No provider configured — the workflow engine falls back to the
+    // No provider configured - the workflow engine falls back to the
     // demo collector for the prototype. This keeps the interface real
     // (same call shape) without requiring paid credentials to run.
     return [];

@@ -5,7 +5,7 @@ const STEPS = [
   {
     icon: "📝",
     title: "Describe in plain language",
-    desc: "Tell ScoutFlow what data you need — jobs, startups, research, contacts — in natural language.",
+    desc: "Tell ScoutFlow what data you need - jobs, startups, research, contacts - in natural language.",
   },
   {
     icon: "🤖",
@@ -15,7 +15,7 @@ const STEPS = [
   {
     icon: "🔍",
     title: "Real data collected & cleaned",
-    desc: "Sources are hit, data extracted, deduplicated, validated, and scored for confidence — automatically.",
+    desc: "Sources are hit, data extracted, deduplicated, validated, and scored for confidence - automatically.",
   },
   {
     icon: "📊",
@@ -30,7 +30,7 @@ const FEATURES = [
   { label: "Deduplication", desc: "Explainable key-based dedup removes noise before storage" },
   { label: "Validation & confidence", desc: "Rule-based validation scores every record 0–1" },
   { label: "Full provenance", desc: "Every record links back to its source URL" },
-  { label: "Dataset versioning", desc: "Each re-run creates a new version — compare anytime" },
+  { label: "Dataset versioning", desc: "Each re-run creates a new version - compare anytime" },
   { label: "Background workers", desc: "BullMQ queue with retries, cancellation, status polling" },
   { label: "Export anywhere", desc: "CSV, JSON, and XLSX with one click" },
 ];
@@ -71,7 +71,7 @@ export default function Landing() {
         </h1>
         <p className="mt-6 text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
           Describe what you need in plain English. ScoutFlow&apos;s AI pipeline collects, cleans,
-          deduplicates, and validates the data — then delivers a searchable, exportable dataset.
+          deduplicates, and validates the data - then delivers a searchable, exportable dataset.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link

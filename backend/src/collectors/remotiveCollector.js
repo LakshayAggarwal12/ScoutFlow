@@ -2,11 +2,11 @@ import { safeGet } from "../utils/urlSafety.js";
 
 const REMOTIVE_API = "https://remotive.com/api/remote-jobs";
 
-// Collector C — a real, publicly-documented, no-API-key-required jobs API
+// Collector C - a real, publicly-documented, no-API-key-required jobs API
 // (Remotive: https://remotive.com/api-documentation). This is the "real
 // collection instead of only mock data" path for job/internship requirements
 // when DEMO_MODE is off. Remotive's response is already structured JSON, so
-// — the same way the demo collector does — each item carries a
+// - the same way the demo collector does - each item carries a
 // `structuredHint` and the extraction stage can skip the AI/regex step for it.
 //
 // Note: this collector calls out to a public third-party API. If that

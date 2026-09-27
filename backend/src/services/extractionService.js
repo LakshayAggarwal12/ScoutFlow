@@ -5,7 +5,7 @@ import { env } from "../config/env.js";
 // Turns raw page-like content into a structured record.
 // In demo mode the collector already attaches a `structuredHint` (it "knows"
 // the fields, simulating a clean source) so we skip the AI round-trip and
-// use it directly — this keeps demo runs fast and free of API dependencies.
+// use it directly - this keeps demo runs fast and free of API dependencies.
 // Otherwise this calls the Python AI service for ambiguous/free-form extraction.
 export async function extractRecord(rawSourceItem, fields) {
   if (rawSourceItem.structuredHint) {

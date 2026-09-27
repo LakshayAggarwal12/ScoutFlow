@@ -49,7 +49,7 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "scoutflow-backend", demoMode: env.demoMode, time: new Date().toISOString() });
 });
 
-// Auth endpoints (public — register + login; /me is protected inside authRoutes)
+// Auth endpoints (public - register + login; /me is protected inside authRoutes)
 app.use("/api/auth", authRoutes);
 
 // All other API routes require JWT authentication

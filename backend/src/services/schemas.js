@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // Mirrors the Pydantic models on the Python side. The Node backend never
-// trusts AI output blindly — every response is re-validated here before
+// trusts AI output blindly - every response is re-validated here before
 // it is persisted or used to drive execution.
 
 export const StructuredRequirementSchema = z.object({

@@ -160,7 +160,7 @@ export default function Dataset() {
                     >
                       {columns.map((col) => (
                         <td key={col} className="px-4 py-2.5 whitespace-nowrap max-w-[220px] truncate">
-                          {record.data[col] ?? <span className="text-slate-300 dark:text-slate-600">—</span>}
+                          {record.data[col] ?? <span className="text-slate-300 dark:text-slate-600">-</span>}
                         </td>
                       ))}
                       <td className="px-4 py-2.5">
@@ -232,7 +232,7 @@ export default function Dataset() {
               {Object.entries(selected.data).map(([key, value]) => (
                 <div key={key}>
                   <dt className="text-xs text-slate-500 dark:text-slate-400 capitalize">{key.replace(/_/g, " ")}</dt>
-                  <dd className="mt-0.5">{value ?? <span className="text-slate-300 dark:text-slate-600">—</span>}</dd>
+                  <dd className="mt-0.5">{value ?? <span className="text-slate-300 dark:text-slate-600">-</span>}</dd>
                 </div>
               ))}
               <div>

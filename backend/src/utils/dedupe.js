@@ -1,4 +1,4 @@
-// Deterministic, explainable deduplication signals — no fuzzy ML matching
+// Deterministic, explainable deduplication signals - no fuzzy ML matching
 // for the prototype, per spec ("do not over-engineer this initially").
 
 function slug(text) {
