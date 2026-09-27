@@ -1,10 +1,15 @@
+import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 
+/**
+ * Verifies the JWT from the Authorization header (Bearer <token>)
+ * or the ?token= query param (for file downloads like export endpoints).
+ *
+ * Sets req.user = { id, email } on success. Never trusts userId from body/query.
+ */
 export function requireAuth(req, res, next) {
-  if (req.path === "/api/health") return next();
-
   let token = null;
-  
+
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith("Bearer ")) {
     token = authHeader.split(" ")[1];
@@ -13,13 +18,18 @@ export function requireAuth(req, res, next) {
   }
 
   if (!token) {
-    return res.status(401).json({ error: "Missing authorization token" });
-  }
-  if (token !== env.adminToken) {
-    return res.status(403).json({ error: "Invalid token" });
+    return res.status(401).json({ error: "Authentication required" });
   }
 
-  // Hardcoded simple user context for ownership tracking
-  req.user = { id: "admin-user", name: "Admin User" };
-  next();
+  try {
+    const payload = jwt.verify(token, env.jwtSecret);
+    // payload.sub is the userId we signed in authController
+    req.user = { id: payload.sub };
+    next();
+  } catch (err) {
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({ error: "Session expired — please log in again" });
+    }
+    return res.status(401).json({ error: "Invalid authentication token" });
+  }
 }

@@ -32,6 +32,10 @@ export const listTasks = asyncHandler(async (req, res) => {
 
 export const getTask = asyncHandler(async (req, res) => {
   const task = await taskService.getTask(req.params.id);
+  // Ownership: null userId means task was created before auth was added (allow it through)
+  if (task.userId && task.userId !== req.user.id) {
+    throw new AppError("Task not found", 404); // 404 not 403, to avoid enumeration
+  }
   res.json(task);
 });
 

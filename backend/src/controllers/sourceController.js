@@ -9,7 +9,7 @@ export const listSources = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit) || 20;
   const { taskId, status } = req.query;
 
-  const where = {};
+  const where = { task: { userId: req.user.id } };
   if (taskId) where.taskId = taskId;
   if (status) where.status = status;
 
@@ -21,15 +21,18 @@ export const listSources = asyncHandler(async (req, res) => {
 });
 
 export const getSource = asyncHandler(async (req, res) => {
-  const source = await prisma.source.findUnique({ where: { id: req.params.id } });
+  const source = await prisma.source.findFirst({ 
+    where: { id: req.params.id, task: { userId: req.user.id } } 
+  });
   if (!source) throw new AppError("Source not found", 404);
   res.json(source);
 });
 
-// Aggregate counts by status for one task — powers the Sources page's
-// health summary (e.g. "18 collected, 2 failed") without pulling every row.
 export const getSourceHealth = asyncHandler(async (req, res) => {
   const { taskId } = req.params;
+  const task = await prisma.task.findFirst({ where: { id: taskId, userId: req.user.id } });
+  if (!task) throw new AppError("Task not found", 404);
+
   const grouped = await prisma.source.groupBy({
     by: ["status"],
     where: { taskId },

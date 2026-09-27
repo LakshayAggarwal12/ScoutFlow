@@ -26,6 +26,8 @@ services:
         value: 22.2.0
       - key: DATABASE_URL
         sync: false
+      - key: DIRECT_URL
+        sync: false
       - key: REDIS_URL
         sync: false
       - key: AI_SERVICE_URL
@@ -35,8 +37,10 @@ services:
           envVarKey: RENDER_EXTERNAL_URL
       - key: ALLOWED_ORIGIN
         sync: false
-      - key: ADMIN_TOKEN
+      - key: JWT_SECRET
         sync: false
+      - key: JWT_EXPIRES_IN
+        value: "7d"
       - key: DEMO_MODE
         value: "false"
       - key: WORKER_MODE

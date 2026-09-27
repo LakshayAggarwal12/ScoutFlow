@@ -13,4 +13,6 @@ export const env = {
   taskMaxAttempts: parseInt(process.env.TASK_MAX_ATTEMPTS || "2", 10),
   allowedOrigin: process.env.ALLOWED_ORIGIN || "",
   adminToken: process.env.ADMIN_TOKEN || "scoutflow-secret-token",
+  jwtSecret: process.env.JWT_SECRET || "scoutflow-dev-secret-change-in-production",
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
 };

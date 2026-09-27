@@ -4,6 +4,7 @@ import morgan from "morgan";
 import taskRoutes from "./routes/taskRoutes.js";
 import sourceRoutes from "./routes/sourceRoutes.js";
 import statsRoutes from "./routes/statsRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 import { requireAuth } from "./middleware/auth.js";
 import { env } from "./config/env.js";
@@ -11,7 +12,6 @@ import { env } from "./config/env.js";
 export const app = express();
 
 // CORS: allow the configured frontend origin(s). In development, allow localhost ports.
-// In production, ALLOWED_ORIGIN should be set to the Vercel deployment URL.
 const corsOptions = {
   origin(origin, callback) {
     // Allow requests with no origin (e.g. same-origin, curl, Render health checks)
@@ -19,10 +19,14 @@ const corsOptions = {
 
     const allowed = new Set([
       "http://localhost:5173",
+      "http://localhost:5174",
       "http://localhost:4173",
       "http://localhost:3000",
     ]);
-    if (env.allowedOrigin) allowed.add(env.allowedOrigin);
+    if (env.allowedOrigin) {
+      // Support comma-separated list of origins
+      env.allowedOrigin.split(",").forEach((o) => allowed.add(o.trim()));
+    }
 
     if (allowed.has(origin)) {
       callback(null, true);
@@ -40,10 +44,15 @@ app.use(morgan(env.nodeEnv === "development" ? "dev" : "combined"));
 // Remove server-identifying header
 app.disable("x-powered-by");
 
+// Public endpoints
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "scoutflow-backend", demoMode: env.demoMode, time: new Date().toISOString() });
 });
 
+// Auth endpoints (public — register + login; /me is protected inside authRoutes)
+app.use("/api/auth", authRoutes);
+
+// All other API routes require JWT authentication
 app.use("/api/tasks", requireAuth, taskRoutes);
 app.use("/api/sources", requireAuth, sourceRoutes);
 app.use("/api/stats", requireAuth, statsRoutes);
