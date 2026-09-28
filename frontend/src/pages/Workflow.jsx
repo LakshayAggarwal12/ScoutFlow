@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getWorkflow, getWorkflowVersions } from "../api/client.js";
+import { getWorkflow, getWorkflowVersions, getTask } from "../api/client.js";
 import StatusBadge from "../components/StatusBadge.jsx";
 import { SkeletonCard } from "../components/Skeleton.jsx";
 import ErrorState from "../components/ErrorState.jsx";
@@ -8,7 +8,7 @@ import ErrorState from "../components/ErrorState.jsx";
 const STEP_LABELS = {
   search: "Source Discovery",
   collect: "Data Collection",
-  extract: "Extraction",
+  extract: "AI Extraction",
   normalize: "Normalization",
   filter: "Filtering",
   validate: "Validation",
@@ -16,9 +16,12 @@ const STEP_LABELS = {
   store: "Store Dataset",
 };
 
+const TERMINAL_STATUSES = ["COMPLETED", "FAILED", "CANCELLED"];
+
 export default function Workflow() {
   const { id } = useParams();
   const [workflow, setWorkflow] = useState(null);
+  const [task, setTask] = useState(null);
   const [versions, setVersions] = useState([]);
   const [selectedVersion, setSelectedVersion] = useState(undefined);
   const [error, setError] = useState(null);
@@ -28,16 +31,26 @@ export default function Workflow() {
     getWorkflowVersions(id).then(setVersions).catch(() => {});
   }, [id]);
 
-  function load() {
-    setLoading(true);
+  const load = useCallback(() => {
     setError(null);
-    getWorkflow(id, selectedVersion)
-      .then(setWorkflow)
+    Promise.all([
+      getWorkflow(id, selectedVersion),
+      getTask(id),
+    ])
+      .then(([wf, t]) => { setWorkflow(wf); setTask(t); })
       .catch((e) => setError(e.response?.data?.error || e.message))
       .finally(() => setLoading(false));
-  }
+  }, [id, selectedVersion]);
 
-  useEffect(load, [id, selectedVersion]);
+  useEffect(() => { setLoading(true); load(); }, [load]);
+
+  // Live polling while task is active
+  useEffect(() => {
+    if (!task || TERMINAL_STATUSES.includes(task.status)) return;
+    const timer = setInterval(load, 2000);
+    return () => clearInterval(timer);
+  }, [task?.status, load]);
+
 
   return (
     <div className="p-8 max-w-2xl animate-fade-in">

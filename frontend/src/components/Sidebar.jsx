@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import Logo from "./Logo.jsx";
 
 const links = [
-  { to: "/", label: "Dashboard", end: true },
+  { to: "/dashboard", label: "Dashboard", end: true },
   { to: "/create", label: "Create Task" },
   { to: "/tasks", label: "Tasks" },
   { to: "/sources", label: "Sources" },

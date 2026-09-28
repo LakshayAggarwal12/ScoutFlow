@@ -15,4 +15,5 @@ export const env = {
   adminToken: process.env.ADMIN_TOKEN || "scoutflow-secret-token",
   jwtSecret: process.env.JWT_SECRET || "scoutflow-dev-secret-change-in-production",
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
+  serperApiKey: process.env.SERPER_API_KEY || "",
 };

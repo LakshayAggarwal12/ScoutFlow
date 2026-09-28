@@ -4,8 +4,26 @@ import { createTask } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
 
 const EXAMPLE_PROMPTS = [
-  "Find 50 AI internships in India posted in the last 7 days. Return company, role, location, salary, posting date and application URL.",
-  "Find backend development internships in Bangalore and return company, role, location, salary, date posted and application URL.",
+  {
+    label: "Jobs",
+    prompt: "Find 30 remote backend engineering jobs posted in the last 7 days. Return company name, role, location, salary, posting date and application URL.",
+  },
+  {
+    label: "Startups",
+    prompt: "Find 20 AI startups in India that raised funding in 2024. Return company name, industry, founding year, funding amount, location, and website.",
+  },
+  {
+    label: "Research",
+    prompt: "Find 15 recent research papers on large language models published in 2024. Return title, authors, abstract summary, publication date, and link.",
+  },
+  {
+    label: "Leads",
+    prompt: "Find 25 SaaS companies in Bangalore. Return company name, product description, employee count, website, and LinkedIn URL.",
+  },
+  {
+    label: "Internships",
+    prompt: "Find 50 AI/ML internships in India posted in the last 7 days. Return company, role, location, stipend, posting date and application URL.",
+  },
 ];
 
 export default function CreateTask() {
@@ -61,18 +79,29 @@ export default function CreateTask() {
       </form>
 
       <div className="mt-8">
-        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Example prompts</p>
-        <div className="space-y-2">
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-3">Try an example</p>
+        <div className="flex flex-wrap gap-2 mb-4">
           {EXAMPLE_PROMPTS.map((example) => (
             <button
-              key={example}
-              onClick={() => setPrompt(example)}
-              className="block w-full text-left text-sm text-slate-600 dark:text-slate-300 card p-3 hover:border-slate-300 dark:hover:border-slate-600 transition-colors duration-150"
+              key={example.label}
+              onClick={() => setPrompt(example.prompt)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors duration-150 border ${
+                prompt === example.prompt
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-400 dark:hover:border-blue-500"
+              }`}
             >
-              {example}
+              {example.label}
             </button>
           ))}
         </div>
+        {EXAMPLE_PROMPTS.map((example) =>
+          prompt === example.prompt ? (
+            <p key={example.label} className="text-sm text-slate-600 dark:text-slate-300 card p-3 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+              {example.prompt}
+            </p>
+          ) : null
+        )}
       </div>
     </div>
   );

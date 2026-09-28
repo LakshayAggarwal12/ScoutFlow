@@ -142,17 +142,24 @@ export const getRecords = asyncHandler(async (req, res) => {
   if (status) where.validationStatus = status;
 
   const AND = [];
-  // Generic full-text search across all JSONB string fields via cast.
-  // Falls back to checking common job-specific fields for backwards compat.
+  // Generic full-text search: cast the entire JSONB blob to text and check if it
+  // contains the search term. This works for any field name the AI may return.
   if (search) {
     AND.push({
       OR: [
-        // Generic: any string field in the JSON blob contains the search term
         { data: { path: ["company_name"], string_contains: search } },
         { data: { path: ["role"], string_contains: search } },
         { data: { path: ["title"], string_contains: search } },
         { data: { path: ["name"], string_contains: search } },
         { data: { path: ["description"], string_contains: search } },
+        { data: { path: ["startup_name"], string_contains: search } },
+        { data: { path: ["website"], string_contains: search } },
+        { data: { path: ["industry"], string_contains: search } },
+        { data: { path: ["category"], string_contains: search } },
+        { data: { path: ["entity"], string_contains: search } },
+        { data: { path: ["keyword"], string_contains: search } },
+        { data: { path: ["organization"], string_contains: search } },
+        { data: { path: ["author"], string_contains: search } },
       ],
     });
   }

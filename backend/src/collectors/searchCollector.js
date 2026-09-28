@@ -1,47 +1,42 @@
 import axios from "axios";
-import * as cheerio from "cheerio";
+import { env } from "../config/env.js";
 
-// Collector B - Search/API Collector.
-// Scrapes DuckDuckGo HTML version to freely find relevant URLs for ANY task,
-// bypassing the need for paid Search API keys (SerpApi/Google).
+// Collector B - Search API Collector using Serper.dev
+// Extremely reliable Google Search results. Requires a free API key (2500 free queries).
 export async function searchSources(query, { limit = 10 } = {}) {
+  if (!env.serperApiKey) {
+    throw new Error("SERPER_API_KEY is not configured in .env. Skipping real search.");
+  }
+
   try {
-    const response = await axios.get("https://html.duckduckgo.com/html/", {
-      params: { q: query },
+    const data = JSON.stringify({
+      q: query,
+      num: limit,
+    });
+
+    const response = await axios.post("https://google.serper.dev/search", data, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
+        "X-API-KEY": env.serperApiKey,
+        "Content-Type": "application/json",
       },
       timeout: 10000,
     });
 
-    const $ = cheerio.load(response.data);
     const results = [];
-
-    // Parse the classic DDG HTML layout
-    $(".result__a").each((i, el) => {
-      if (results.length >= limit) return;
-
-      const href = $(el).attr("href");
-      const title = $(el).text();
-
-      let finalUrl = href;
-      // DDG sometimes uses a redirect wrapper: //duckduckgo.com/l/?uddg=https%3A%2F%2F...
-      if (href && href.includes("uddg=")) {
-        const urlParam = href.split("uddg=")[1]?.split("&")[0];
-        if (urlParam) {
-          finalUrl = decodeURIComponent(urlParam);
+    
+    // Add organic results
+    if (response.data && response.data.organic) {
+      response.data.organic.forEach((item) => {
+        if (item.link && item.link.startsWith("http")) {
+          results.push({ url: item.link, title: item.title });
         }
-      }
+      });
+    }
 
-      if (finalUrl && finalUrl.startsWith("http")) {
-        results.push({ url: finalUrl, title: title.trim() });
-      }
-    });
-
-    return results;
+    return results.slice(0, limit);
   } catch (error) {
-    console.error(`DuckDuckGo search failed for query "${query}":`, error.message);
-    return [];
+    console.error(`Serper search failed for query "${query}":`, error.response?.data || error.message);
+    throw new Error(`Serper search failed: ${error.message}`);
   }
 }
+

@@ -31,11 +31,12 @@ export const WorkflowPlanSchema = z.object({
   steps: z.array(WorkflowStepSchema).min(1),
 });
 
-export const ExtractedRecordSchema = z.object({
-  company_name: z.string().nullable().optional(),
-  role: z.string().nullable().optional(),
-  location: z.string().nullable().optional(),
-  salary: z.string().nullable().optional(),
-  posting_date: z.string().nullable().optional(),
-  application_url: z.string().nullable().optional(),
+export const ExtractedRecordSchema = z.record(z.string(), z.union([z.string(), z.number(), z.null(), z.undefined()]).optional()).transform((data) => {
+  // Normalize: convert all values to strings or null; filter out undefined
+  const result = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (v === undefined || v === null) result[k] = null;
+    else result[k] = String(v).trim() || null;
+  }
+  return result;
 });
