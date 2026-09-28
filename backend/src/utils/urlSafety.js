@@ -17,7 +17,11 @@ function isPrivateIp(ip) {
   }
   if (net.isIPv6(ip)) {
     const lower = ip.toLowerCase();
-    if (lower === "::1") return true; // loopback
+    // IPv4-mapped IPv6 ("::ffff:127.0.0.1") must be judged by its embedded
+    // IPv4 address, otherwise loopback/private targets slip past this guard.
+    const mapped = lower.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+    if (mapped) return isPrivateIp(mapped[1]);
+    if (lower === "::" || lower === "::1") return true; // unspecified / loopback
     if (lower.startsWith("fc") || lower.startsWith("fd")) return true; // unique local
     if (lower.startsWith("fe80")) return true; // link-local
     return false;

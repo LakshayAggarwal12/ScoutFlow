@@ -294,7 +294,7 @@ Open **http://localhost:5173**, enter your access token when prompted, and creat
 |---|---|---|
 | `PORT` | Service port | `8000` |
 | `LLM_API_KEY` | API key for the LLM provider | empty |
-| `LLM_MODEL` | Model name | `llama-3.1-8b-instant` |
+| `LLM_MODEL` | Model name | `openai/gpt-oss-120b` |
 | `LLM_BASE_URL` | OpenAI-compatible base URL | `https://api.groq.com/openai/v1` |
 
 If `LLM_API_KEY` is not set, the AI service automatically falls back to deterministic rule-based parsing, so the pipeline still runs.

@@ -25,6 +25,15 @@ export function requireAuth(req, res, next) {
     const payload = jwt.verify(token, env.jwtSecret);
     // payload.sub is the userId we signed in authController
     req.user = { id: payload.sub };
+
+    // Short-lived download tokens are only valid for dataset export
+    // downloads - never as a general session credential.
+    if (payload.use === "download") {
+      const pathOnly = (req.originalUrl || "").split("?")[0];
+      if (!pathOnly.includes("/export/")) {
+        return res.status(403).json({ error: "Download token is only valid for export downloads" });
+      }
+    }
     next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {

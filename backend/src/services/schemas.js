@@ -31,12 +31,56 @@ export const WorkflowPlanSchema = z.object({
   steps: z.array(WorkflowStepSchema).min(1),
 });
 
-export const ExtractedRecordSchema = z.record(z.string(), z.union([z.string(), z.number(), z.null(), z.undefined()]).optional()).transform((data) => {
-  // Normalize: convert all values to strings or null; filter out undefined
+// Coerce any JSON value to a displayable string (or null). Arrays and
+// objects are flattened rather than rejected: the old schema required
+// string|number|null, so a list like `founders: ["A", "B"]` failed zod
+// validation and the whole record silently collapsed to `{}`.
+function humanizeKey(key) {
+  return String(key).replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function coerceScalar(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") return value.trim() || null;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value).trim() || null;
+  }
+  if (Array.isArray(value)) {
+    const parts = value.map(coerceScalar).filter((v) => v !== null);
+    return parts.length ? parts.join(", ") : null;
+  }
+  if (typeof value === "object") {
+    const parts = Object.entries(value)
+      .map(([k, v]) => {
+        const scalar = coerceScalar(v);
+        return scalar ? `${humanizeKey(k)}: ${scalar}` : null;
+      })
+      .filter(Boolean);
+    return parts.length ? parts.join("; ") : null;
+  }
+  return String(value).trim() || null;
+}
+
+export const ExtractedRecordSchema = z.record(z.string(), z.unknown()).transform((data) => {
   const result = {};
   for (const [k, v] of Object.entries(data)) {
-    if (v === undefined || v === null) result[k] = null;
-    else result[k] = String(v).trim() || null;
+    result[k] = coerceScalar(v);
   }
   return result;
 });
+
+// Extraction now returns ONE record per entity found on a page, so the AI
+// response is a JSON array. A single object (legacy / single-entity pages)
+// is accepted and wrapped; non-object elements (stray prose in the array)
+// are dropped rather than failing the whole parse.
+export const ExtractedRecordsSchema = z.preprocess(
+  (value) => {
+    const arr = Array.isArray(value)
+      ? value
+      : value && typeof value === "object"
+        ? [value]
+        : [];
+    return arr.filter((el) => el && typeof el === "object" && !Array.isArray(el));
+  },
+  z.array(ExtractedRecordSchema)
+);

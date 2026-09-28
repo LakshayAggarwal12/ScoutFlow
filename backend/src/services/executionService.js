@@ -65,7 +65,10 @@ export async function executeTask(taskId, { bullJob } = {}) {
 
     await checkpoint(taskId);
     const freshTask = await prisma.task.findUnique({ where: { id: taskId } });
-    const { dataset, stats } = await runPipeline(freshTask, sources, { usedMockData });
+    // Hand the generated plan to the pipeline so its step purposes show up
+    // in the execution log (previously the plan was written and never used).
+    const workflowSteps = workflow?.definition?.steps || aiWorkflow?.steps || [];
+    const { dataset, stats } = await runPipeline(freshTask, sources, { usedMockData, workflowSteps });
 
     await markWorkflowStatus(workflow.id, "COMPLETED");
     await updateTaskStatus(taskId, "COMPLETED");

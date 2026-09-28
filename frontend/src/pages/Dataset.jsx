@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getRecords, getDatasetVersions, exportCsvUrl, exportJsonUrl, exportXlsxUrl } from "../api/client.js";
+import { getRecords, getDatasetVersions, getTask, getDownloadToken, exportCsvUrl, exportJsonUrl, exportXlsxUrl } from "../api/client.js";
 import StatusBadge from "../components/StatusBadge.jsx";
 import MockDataBadge from "../components/MockDataBadge.jsx";
 import { SkeletonTable } from "../components/Skeleton.jsx";
@@ -29,6 +29,25 @@ function confidenceTone(pct) {
   return "bg-red-500";
 }
 
+// Download link built from a short-lived token. Until the token arrives the
+// link is inert instead of firing an unauthenticated request.
+function ExportLink({ id, token, buildUrl, children }) {
+  const ready = Boolean(token);
+  return (
+    <a
+      href={ready ? buildUrl(id, token) : "#"}
+      download={ready}
+      aria-disabled={!ready}
+      onClick={(e) => {
+        if (!ready) e.preventDefault();
+      }}
+      className="btn-secondary btn-sm"
+    >
+      {children}
+    </a>
+  );
+}
+
 export default function Dataset() {
   const { id } = useParams();
   const [search, setSearch] = useState("");
@@ -42,9 +61,33 @@ export default function Dataset() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [requestedFields, setRequestedFields] = useState([]);
+  const [requestedLimit, setRequestedLimit] = useState(null);
+  const [downloadToken, setDownloadToken] = useState(null);
 
   useEffect(() => {
     getDatasetVersions(id).then(setVersions).catch(() => {});
+    // Requested fields order the table columns honestly (requested fields
+    // stay visible even when a page's records lack them), and the requested
+    // limit lets us show "12 / 50" instead of implying the run was complete.
+    getTask(id)
+      .then((t) => {
+        setRequestedFields(t?.structuredRequirement?.fields || []);
+        setRequestedLimit(t?.structuredRequirement?.limit ?? null);
+      })
+      .catch(() => {});
+  }, [id]);
+
+  // Short-lived export token: fetched on mount, refreshed before it expires.
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => getDownloadToken().then((t) => alive && setDownloadToken(t)).catch(() => {});
+    refresh();
+    const interval = setInterval(refresh, 8 * 60 * 1000);
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
   }, [id]);
 
   // Escape closes the record drawer.
@@ -76,7 +119,20 @@ export default function Dataset() {
 
   useEffect(load, [id, page, search, location, status, sort, version]);
 
-  const columns = data?.items?.[0] ? Object.keys(data.items[0].data) : [];
+  // Columns = requested fields (in requirement order, always shown) plus any
+  // extra keys the AI returned on this page. Previously columns came from
+  // items[0] alone, so records with different shapes displayed blanks.
+  const columns = (() => {
+    const present = new Set();
+    (data?.items || []).forEach((item) => Object.keys(item.data || {}).forEach((k) => present.add(k)));
+    const ordered = [];
+    const add = (key) => {
+      if (key && !ordered.includes(key)) ordered.push(key);
+    };
+    requestedFields.forEach(add);
+    [...present].forEach(add);
+    return ordered;
+  })();
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
   const hasFilters = Boolean(search || location || status || sort !== "newest");
 
@@ -98,6 +154,7 @@ export default function Dataset() {
               <span className="tag tabular-nums">v{data.datasetVersion}</span>
               <span className="text-xs text-slate-400 dark:text-slate-500">
                 {formatNumber(data.total)} {data.total === 1 ? "record" : "records"}
+                {requestedLimit ? ` of ${formatNumber(requestedLimit)} requested` : ""}
               </span>
             </>
           ) : null
@@ -122,15 +179,23 @@ export default function Dataset() {
                 ))}
               </select>
             )}
-            <a href={exportCsvUrl(id)} className="btn-secondary btn-sm" download>
+            <ExportLink id={id} token={downloadToken} buildUrl={exportCsvUrl}>
               <IconDownload size={15} />
               CSV
-            </a>
-            <a href={exportJsonUrl(id)} className="btn-secondary btn-sm" download>
+            </ExportLink>
+            <ExportLink id={id} token={downloadToken} buildUrl={exportJsonUrl}>
               <IconDownload size={15} />
               JSON
-            </a>
-            <a href={exportXlsxUrl(id)} className="btn-accent btn-sm" download>
+            </ExportLink>
+            <a
+              href={downloadToken ? exportXlsxUrl(id, downloadToken) : "#"}
+              download={Boolean(downloadToken)}
+              aria-disabled={!downloadToken}
+              onClick={(e) => {
+                if (!downloadToken) e.preventDefault();
+              }}
+              className="btn-accent btn-sm"
+            >
               <IconDownload size={15} />
               XLSX
             </a>

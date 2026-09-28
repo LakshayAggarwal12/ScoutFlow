@@ -25,10 +25,16 @@ api.interceptors.response.use(
   }
 );
 
-const getTokenParam = () => {
-  const t = localStorage.getItem("sf_token");
-  return t ? `?token=${encodeURIComponent(t)}` : "";
-};
+// Export URLs - short-lived download token instead of the session JWT.
+// The session JWT (7-day expiry) must never appear in URLs: it would land in
+// server access logs and potentially Referer headers. The 10-minute token is
+// fetched per page view and refreshed by the caller.
+export const getDownloadToken = () => api.post("/auth/download-token").then((r) => r.data.token);
+const exportUrl = (id, format, token) =>
+  `${API_URL}/tasks/${id}/export/${format}?token=${encodeURIComponent(token || "")}`;
+export const exportCsvUrl = (id, token) => exportUrl(id, "csv", token);
+export const exportJsonUrl = (id, token) => exportUrl(id, "json", token);
+export const exportXlsxUrl = (id, token) => exportUrl(id, "xlsx", token);
 
 // Auth
 export const registerUser = (name, email, password) => api.post("/auth/register", { name, email, password }).then((r) => r.data);
@@ -54,11 +60,6 @@ export const getLogs = (id) => api.get(`/tasks/${id}/logs`).then((r) => r.data);
 export const getDataset = (id, version) => api.get(`/tasks/${id}/dataset`, { params: { version } }).then((r) => r.data);
 export const getDatasetVersions = (id) => api.get(`/tasks/${id}/dataset/versions`).then((r) => r.data);
 export const getRecords = (id, params) => api.get(`/tasks/${id}/records`, { params }).then((r) => r.data);
-
-// Export URLs (token appended as query param for browser download links)
-export const exportCsvUrl = (id) => `${API_URL}/tasks/${id}/export/csv${getTokenParam()}`;
-export const exportJsonUrl = (id) => `${API_URL}/tasks/${id}/export/json${getTokenParam()}`;
-export const exportXlsxUrl = (id) => `${API_URL}/tasks/${id}/export/xlsx${getTokenParam()}`;
 
 // Stats
 export const getStats = () => api.get("/stats").then((r) => r.data);

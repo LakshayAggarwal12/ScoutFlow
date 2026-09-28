@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { getTask, getLogs, cancelTask, runTask, getSourceHealth, deleteTask } from "../api/client.js";
+import { getTask, getLogs, getDataset, cancelTask, runTask, getSourceHealth, deleteTask } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import PipelineChecklist from "../components/PipelineChecklist.jsx";
@@ -45,6 +45,7 @@ export default function TaskDetail() {
   const { notify } = useToast();
   const [task, setTask] = useState(null);
   const [logs, setLogs] = useState([]);
+  const [dataset, setDataset] = useState(null);
   const [sourceHealth, setSourceHealth] = useState(null);
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
@@ -56,6 +57,11 @@ export default function TaskDetail() {
       setTask(taskData);
       setLogs(logsData);
       getSourceHealth(id).then(setSourceHealth).catch(() => {});
+      // The dataset row carries the authoritative usedMockData flag; it only
+      // exists once a run produced one (404 before that).
+      getDataset(id)
+        .then(setDataset)
+        .catch(() => setDataset(null));
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     }
@@ -136,7 +142,12 @@ export default function TaskDetail() {
 
   const stats = logs.find((l) => l.step === "PIPELINE" && l.status === "COMPLETED")?.metadata;
   const isActive = ACTIVE_STATUSES.includes(task.status);
-  const usedMockData = logs.some((l) => l.message?.includes("demo/mock data"));
+  // Prefer the dataset's authoritative flag; fall back to log sniffing only
+  // while no dataset exists yet (log-wording inference broke whenever wording
+  // changed - e.g. the new fallback messages).
+  const usedMockData = dataset
+    ? dataset.usedMockData
+    : logs.some((l) => l.message?.toLowerCase().includes("demo"));
   const totalChecked = stats ? (stats.valid || 0) + (stats.partial || 0) + (stats.invalid || 0) : 0;
   const pct = (value) => (totalChecked > 0 ? Math.round((value / totalChecked) * 100) : 0);
 

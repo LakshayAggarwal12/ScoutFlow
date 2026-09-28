@@ -24,11 +24,3 @@ class ExtractRequest(BaseModel):
     raw_content: str
     fields: List[str]
 
-
-class ExtractedRecord(BaseModel):
-    company_name: Optional[str] = None
-    role: Optional[str] = None
-    location: Optional[str] = None
-    salary: Optional[str] = None
-    posting_date: Optional[str] = None
-    application_url: Optional[str] = None

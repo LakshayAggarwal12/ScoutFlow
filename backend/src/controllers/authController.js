@@ -54,3 +54,15 @@ export const getMe = asyncHandler(async (req, res) => {
   if (!user) throw new AppError("User not found", 404);
   res.json(user);
 });
+
+// Short-lived token for export/download links (?token=...). The session JWT
+// (default 7d expiry) must never appear in URLs - it lands in access logs and
+// potentially Referer headers. A 10-minute token is plenty to start a browser
+// download and is worthless afterwards.
+export const downloadToken = asyncHandler(async (req, res) => {
+  // `use: "download"` scopes this token: requireAuth rejects it outside
+  // export routes, so a leaked download URL (browser history, Referer
+  // header) can't be replayed as a full session token.
+  const token = jwt.sign({ sub: req.user.id, use: "download" }, env.jwtSecret, { expiresIn: "10m" });
+  res.json({ token, expiresIn: 600 });
+});

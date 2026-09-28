@@ -13,6 +13,17 @@ async function enqueueAndTrack(taskId) {
   return job;
 }
 
+// Ownership guard for read/export endpoints. Mirrors getTask: 404 (not 403)
+// when the task belongs to another user, to avoid enumeration. Previously
+// records/exports/dataset/logs/workflow were readable cross-account.
+async function requireOwnedTask(taskId, userId) {
+  const task = await taskService.getTask(taskId);
+  if (task.userId && task.userId !== userId) {
+    throw new AppError("Task not found", 404);
+  }
+  return task;
+}
+
 export const createTask = asyncHandler(async (req, res) => {
   const { prompt } = req.body;
   const userId = req.user?.id;
@@ -85,6 +96,7 @@ export const deleteTask = asyncHandler(async (req, res) => {
 });
 
 export const getWorkflow = asyncHandler(async (req, res) => {
+  await requireOwnedTask(req.params.id, req.user.id);
   const { version } = req.query;
   const workflow = await workflowService.getWorkflowForTask(req.params.id, version ? parseInt(version, 10) : undefined);
   res.json(workflow);
@@ -93,11 +105,13 @@ export const getWorkflow = asyncHandler(async (req, res) => {
 // Powers "revisit previous workflows" - lists every plan version the AI has
 // generated for this task across its original run and any reruns.
 export const listWorkflowVersions = asyncHandler(async (req, res) => {
+  await requireOwnedTask(req.params.id, req.user.id);
   const versions = await workflowService.listWorkflowVersions(req.params.id);
   res.json(versions);
 });
 
 export const getLogs = asyncHandler(async (req, res) => {
+  await requireOwnedTask(req.params.id, req.user.id);
   const logs = await prisma.executionLog.findMany({
     where: { taskId: req.params.id },
     orderBy: { createdAt: "asc" },
@@ -109,6 +123,7 @@ export const getLogs = asyncHandler(async (req, res) => {
 // earlier version (basic dataset versioning - each rerun of a task creates
 // a new Dataset row rather than overwriting the last one).
 export const getDataset = asyncHandler(async (req, res) => {
+  await requireOwnedTask(req.params.id, req.user.id);
   const { version } = req.query;
   const where = { taskId: req.params.id };
   if (version) where.version = parseInt(version, 10);
@@ -119,6 +134,7 @@ export const getDataset = asyncHandler(async (req, res) => {
 });
 
 export const listDatasetVersions = asyncHandler(async (req, res) => {
+  await requireOwnedTask(req.params.id, req.user.id);
   const datasets = await prisma.dataset.findMany({
     where: { taskId: req.params.id },
     orderBy: { version: "desc" },
@@ -129,6 +145,7 @@ export const listDatasetVersions = asyncHandler(async (req, res) => {
 
 export const getRecords = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const task = await requireOwnedTask(id, req.user.id);
   const page = parseInt(req.query.page) || 1;
   const limit = Math.min(parseInt(req.query.limit) || 20, 100);
   const { search, location, sort, status, version } = req.query;
@@ -142,25 +159,17 @@ export const getRecords = asyncHandler(async (req, res) => {
   if (status) where.validationStatus = status;
 
   const AND = [];
-  // Generic full-text search: cast the entire JSONB blob to text and check if it
-  // contains the search term. This works for any field name the AI may return.
+  // Generic search across the task's REQUESTED fields (dynamic) plus common
+  // field names - previously a hardcoded list missed requested fields like
+  // "founders"/"funding", so searching for them silently returned nothing.
   if (search) {
+    const FALLBACK_KEYS = [
+      "company_name", "role", "title", "name", "description", "startup_name",
+      "website", "industry", "category", "entity", "keyword", "organization", "author",
+    ];
+    const searchPaths = [...new Set([...(task.structuredRequirement?.fields || []), ...FALLBACK_KEYS])];
     AND.push({
-      OR: [
-        { data: { path: ["company_name"], string_contains: search } },
-        { data: { path: ["role"], string_contains: search } },
-        { data: { path: ["title"], string_contains: search } },
-        { data: { path: ["name"], string_contains: search } },
-        { data: { path: ["description"], string_contains: search } },
-        { data: { path: ["startup_name"], string_contains: search } },
-        { data: { path: ["website"], string_contains: search } },
-        { data: { path: ["industry"], string_contains: search } },
-        { data: { path: ["category"], string_contains: search } },
-        { data: { path: ["entity"], string_contains: search } },
-        { data: { path: ["keyword"], string_contains: search } },
-        { data: { path: ["organization"], string_contains: search } },
-        { data: { path: ["author"], string_contains: search } },
-      ],
+      OR: searchPaths.map((field) => ({ data: { path: [field], string_contains: search } })),
     });
   }
   if (location) {
@@ -198,6 +207,7 @@ export const getRecords = asyncHandler(async (req, res) => {
 });
 
 export const exportCsv = asyncHandler(async (req, res) => {
+  await requireOwnedTask(req.params.id, req.user.id);
   const csv = await exportDatasetCsv(req.params.id, req.query.version);
   res.setHeader("Content-Type", "text/csv");
   res.setHeader("Content-Disposition", `attachment; filename="scoutflow-dataset-${req.params.id}.csv"`);
@@ -205,6 +215,7 @@ export const exportCsv = asyncHandler(async (req, res) => {
 });
 
 export const exportJson = asyncHandler(async (req, res) => {
+  await requireOwnedTask(req.params.id, req.user.id);
   const json = await exportDatasetJson(req.params.id, req.query.version);
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Content-Disposition", `attachment; filename="scoutflow-dataset-${req.params.id}.json"`);
@@ -212,6 +223,7 @@ export const exportJson = asyncHandler(async (req, res) => {
 });
 
 export const exportXlsx = asyncHandler(async (req, res) => {
+  await requireOwnedTask(req.params.id, req.user.id);
   const buffer = await exportDatasetXlsx(req.params.id, req.query.version);
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="scoutflow-dataset-${req.params.id}.xlsx"`);

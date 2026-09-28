@@ -11,9 +11,19 @@ services:
       - key: LLM_API_KEY
         sync: false
       - key: LLM_MODEL
-        value: "llama-3.1-8b-instant"
+        value: "openai/gpt-oss-120b"
       - key: LLM_BASE_URL
         value: "https://api.groq.com/openai/v1"
+      # FAST prototype profile for the Groq free tier (~2k tokens/req).
+      # Raise for deeper production runs (deeper LLM passes).
+      - key: LLM_EXTRACT_WINDOW
+        value: "6000"
+      - key: LLM_MAX_TOKENS
+        value: "1500"
+      - key: LLM_MAX_ATTEMPTS
+        value: "2"
+      - key: LLM_MAX_RETRY_WAIT
+        value: "12"
 
   - type: web
     name: scoutflow-backend
@@ -43,5 +53,26 @@ services:
         value: "7d"
       - key: DEMO_MODE
         value: "false"
+      # Never substitute demo data for a failed real collection in production.
+      - key: ALLOW_DEMO_FALLBACK
+        value: "false"
+      # Required for live web discovery - without it the search collector
+      # cannot run and the task will fail (instead of faking results).
+      - key: SERPER_API_KEY
+        sync: false
       - key: WORKER_MODE
         value: "in-process"
+      # FAST prototype profile for the Groq free tier (~3-6 min runs).
+      # Raise for deeper production runs (more sources, deeper LLM passes).
+      - key: SEARCH_MAX_QUERIES
+        value: "2"
+      - key: SEARCH_PAGES_PER_QUERY
+        value: "1"
+      - key: MAX_SOURCES
+        value: "12"
+      - key: EXTRACTION_EARLY_STOP
+        value: "60"
+      - key: FETCH_CONCURRENCY
+        value: "4"
+      - key: EXTRACTION_CONCURRENCY
+        value: "2"

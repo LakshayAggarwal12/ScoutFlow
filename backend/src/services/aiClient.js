@@ -14,6 +14,14 @@ export async function planWorkflow(structuredRequirement) {
 }
 
 export async function extractFields(rawContent, fields) {
-  const { data } = await client.post("/ai/extract", { raw_content: rawContent, fields });
+  // Extraction retries rate limits inside the AI service: each attempt can
+  // sleep up to _MAX_RETRY_WAIT_SECONDS honoring Groq's "try again in Ns"
+  // hint, so a full 3-attempt chain can take ~2-3 minutes. Time out below
+  // that and we discard work the AI service actually completed.
+  const { data } = await client.post(
+    "/ai/extract",
+    { raw_content: rawContent, fields },
+    { timeout: 200000 }
+  );
   return data;
 }
