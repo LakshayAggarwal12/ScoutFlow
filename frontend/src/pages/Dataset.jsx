@@ -1,13 +1,33 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { getRecords, getDatasetVersions, exportCsvUrl, exportJsonUrl, exportXlsxUrl } from "../api/client.js";
 import StatusBadge from "../components/StatusBadge.jsx";
 import MockDataBadge from "../components/MockDataBadge.jsx";
 import { SkeletonTable } from "../components/Skeleton.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import ErrorState from "../components/ErrorState.jsx";
+import PageHeader from "../components/PageHeader.jsx";
+import Pagination from "../components/Pagination.jsx";
+import SearchInput from "../components/SearchInput.jsx";
+import { IconDownload, IconExternal, IconFilter, IconTable, IconX } from "../components/icons.jsx";
+import { formatDateTime, formatNumber, hostOf, titleCase } from "../lib/format.js";
 
 const PAGE_SIZE = 10;
+
+// 0-1 confidence score → whole percentage for display.
+function confidencePct(value) {
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  if (Number.isNaN(n)) return null;
+  return Math.max(0, Math.min(100, Math.round(n * 100)));
+}
+
+function confidenceTone(pct) {
+  if (pct === null) return "bg-slate-300 dark:bg-slate-600";
+  if (pct >= 90) return "bg-emerald-500";
+  if (pct >= 60) return "bg-amber-500";
+  return "bg-red-500";
+}
 
 export default function Dataset() {
   const { id } = useParams();
@@ -26,6 +46,16 @@ export default function Dataset() {
   useEffect(() => {
     getDatasetVersions(id).then(setVersions).catch(() => {});
   }, [id]);
+
+  // Escape closes the record drawer.
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setSelected(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selected]);
 
   function load() {
     setLoading(true);
@@ -48,217 +78,338 @@ export default function Dataset() {
 
   const columns = data?.items?.[0] ? Object.keys(data.items[0].data) : [];
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
+  const hasFilters = Boolean(search || location || status || sort !== "newest");
 
   return (
-    <div className="p-8 animate-fade-in">
-      <Link to={`/tasks/${id}`} className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors duration-150">
-        ← Back to task
-      </Link>
-      <div className="flex items-center justify-between mt-3 flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold">Dataset Explorer</h1>
-          {data?.usedMockData && <MockDataBadge />}
-        </div>
-        <div className="flex items-center gap-2">
-          {versions.length > 1 && (
-            <select
-              className="input max-w-[140px]"
-              value={version ?? ""}
-              onChange={(e) => {
+    <div className="page page-full animate-fade-in">
+      <PageHeader
+        back={{ to: `/tasks/${id}`, label: "Back to task" }}
+        eyebrow="Dataset"
+        title={
+          <span className="flex flex-wrap items-center gap-3">
+            Dataset Explorer
+            {data?.usedMockData && <MockDataBadge />}
+          </span>
+        }
+        description="Browse, filter and export the validated records collected for this task."
+        meta={
+          data ? (
+            <>
+              <span className="tag tabular-nums">v{data.datasetVersion}</span>
+              <span className="text-xs text-slate-400 dark:text-slate-500">
+                {formatNumber(data.total)} {data.total === 1 ? "record" : "records"}
+              </span>
+            </>
+          ) : null
+        }
+        actions={
+          <>
+            {versions.length > 1 && (
+              <select
+                className="select w-auto max-w-[190px]"
+                value={version ?? ""}
+                onChange={(e) => {
+                  setPage(1);
+                  setVersion(e.target.value ? parseInt(e.target.value, 10) : undefined);
+                }}
+                aria-label="Dataset version"
+              >
+                <option value="">Latest (v{versions[0]?.version})</option>
+                {versions.map((v) => (
+                  <option key={v.id} value={v.version}>
+                    v{v.version} ({v._count.records} records)
+                  </option>
+                ))}
+              </select>
+            )}
+            <a href={exportCsvUrl(id)} className="btn-secondary btn-sm" download>
+              <IconDownload size={15} />
+              CSV
+            </a>
+            <a href={exportJsonUrl(id)} className="btn-secondary btn-sm" download>
+              <IconDownload size={15} />
+              JSON
+            </a>
+            <a href={exportXlsxUrl(id)} className="btn-accent btn-sm" download>
+              <IconDownload size={15} />
+              XLSX
+            </a>
+          </>
+        }
+      />
+
+      {/* Filters */}
+      <div className="card mt-6 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="hidden items-center gap-1.5 text-xs font-medium text-slate-500 sm:flex dark:text-slate-400">
+            <IconFilter size={14} />
+            Filters
+          </span>
+          <SearchInput
+            className="w-full sm:max-w-xs"
+            value={search}
+            onChange={(value) => {
+              setPage(1);
+              setSearch(value);
+            }}
+            placeholder="Search company, role, title…"
+            aria-label="Search records"
+          />
+          <input
+            className="input w-full sm:max-w-[200px]"
+            placeholder="Filter by location"
+            value={location}
+            onChange={(e) => {
+              setPage(1);
+              setLocation(e.target.value);
+            }}
+            aria-label="Filter by location"
+          />
+          <select
+            className="select w-auto"
+            value={status}
+            onChange={(e) => {
+              setPage(1);
+              setStatus(e.target.value);
+            }}
+            aria-label="Filter by validation status"
+          >
+            <option value="">All statuses</option>
+            <option value="VALID">Valid</option>
+            <option value="PARTIAL">Partial</option>
+            <option value="INVALID">Invalid</option>
+          </select>
+          <select
+            className="select w-auto"
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            aria-label="Sort records"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
+          {hasFilters && (
+            <button
+              type="button"
+              className="btn-ghost btn-sm"
+              onClick={() => {
                 setPage(1);
-                setVersion(e.target.value ? parseInt(e.target.value, 10) : undefined);
+                setSearch("");
+                setLocation("");
+                setStatus("");
+                setSort("newest");
               }}
             >
-              <option value="">Latest (v{versions[0]?.version})</option>
-              {versions.map((v) => (
-                <option key={v.id} value={v.version}>
-                  v{v.version} ({v._count.records} records)
-                </option>
-              ))}
-            </select>
+              <IconX size={14} />
+              Clear
+            </button>
           )}
-          <a href={exportCsvUrl(id)} className="btn-secondary" download>
-            Export CSV
-          </a>
-          <a href={exportJsonUrl(id)} className="btn-secondary" download>
-            Export JSON
-          </a>
-          <a href={exportXlsxUrl(id)} className="btn-primary" download>
-            Export XLSX
-          </a>
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-3">
-        <input
-          className="input max-w-xs"
-          placeholder="Search company or role..."
-          value={search}
-          onChange={(e) => {
-            setPage(1);
-            setSearch(e.target.value);
-          }}
-        />
-        <input
-          className="input max-w-xs"
-          placeholder="Filter by location..."
-          value={location}
-          onChange={(e) => {
-            setPage(1);
-            setLocation(e.target.value);
-          }}
-        />
-        <select
-          className="input max-w-[160px]"
-          value={status}
-          onChange={(e) => {
-            setPage(1);
-            setStatus(e.target.value);
-          }}
-        >
-          <option value="">All statuses</option>
-          <option value="VALID">Valid</option>
-          <option value="PARTIAL">Partial</option>
-          <option value="INVALID">Invalid</option>
-        </select>
-        <select className="input max-w-[160px]" value={sort} onChange={(e) => setSort(e.target.value)}>
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-        </select>
-      </div>
-
-      <div className="mt-5">
+      <div className="mt-4">
         {loading && <SkeletonTable rows={PAGE_SIZE} cols={6} />}
         {!loading && error && <ErrorState message={error} onRetry={load} />}
         {!loading && !error && data && data.items.length === 0 && (
           <EmptyState
+            icon={IconTable}
             title="No records match these filters"
             description="Try clearing the search, location, or status filters."
+            action={
+              hasFilters ? (
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  onClick={() => {
+                    setPage(1);
+                    setSearch("");
+                    setLocation("");
+                    setStatus("");
+                    setSort("newest");
+                  }}
+                >
+                  <IconX size={14} />
+                  Clear filters
+                </button>
+              ) : null
+            }
           />
         )}
         {!loading && !error && data && data.items.length > 0 && (
           <>
-            <div className="card overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-left text-xs text-slate-500 dark:text-slate-400">
-                    {columns.map((col) => (
-                      <th key={col} className="px-4 py-2.5 font-medium capitalize">
-                        {col.replace(/_/g, " ")}
-                      </th>
-                    ))}
-                    <th className="px-4 py-2.5 font-medium">Status</th>
-                    <th className="px-4 py-2.5 font-medium">Source</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.items.map((record) => (
-                    <tr
-                      key={record.id}
-                      className="border-b border-slate-100 dark:border-slate-800 last:border-0 row-hover cursor-pointer"
-                      onClick={() => setSelected(record)}
-                    >
+            <div className="card overflow-hidden">
+              <div className="table-scroll scroll-thin">
+                <table className="table">
+                  <thead>
+                    <tr className="thead-row">
                       {columns.map((col) => (
-                        <td key={col} className="px-4 py-2.5 whitespace-nowrap max-w-[220px] truncate">
-                          {record.data[col] ?? <span className="text-slate-300 dark:text-slate-600">-</span>}
-                        </td>
+                        <th key={col} className="th">
+                          {titleCase(col)}
+                        </th>
                       ))}
-                      <td className="px-4 py-2.5">
-                        <StatusBadge status={record.validationStatus} />
-                      </td>
-                      <td className="px-4 py-2.5">
-                        {record.source?.url && (
-                          <a
-                            href={record.source.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-accent hover:underline"
-                          >
-                            View Source
-                          </a>
-                        )}
-                      </td>
+                      <th className="th">Validation</th>
+                      <th className="th">Confidence</th>
+                      <th className="th text-right">Source</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
-              <span>
-                {data.total} record{data.total !== 1 ? "s" : ""}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  className="btn-secondary px-3 py-1.5"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  Prev
-                </button>
-                <span>
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  className="btn-secondary px-3 py-1.5"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </button>
+                  </thead>
+                  <tbody>
+                    {data.items.map((record) => {
+                      const pct = confidencePct(record.confidence);
+                      return (
+                        <tr
+                          key={record.id}
+                          className="tr cursor-pointer"
+                          onClick={() => setSelected(record)}
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setSelected(record);
+                            }
+                          }}
+                        >
+                          {columns.map((col) => (
+                            <td
+                              key={col}
+                              className="td max-w-[260px] truncate text-slate-700 dark:text-slate-200"
+                              title={record.data[col] != null ? String(record.data[col]) : undefined}
+                            >
+                              {record.data[col] ?? <span className="text-slate-300 dark:text-slate-600">—</span>}
+                            </td>
+                          ))}
+                          <td className="td">
+                            <StatusBadge status={record.validationStatus} />
+                          </td>
+                          <td className="td">
+                            {pct === null ? (
+                              <span className="text-slate-300 dark:text-slate-600">—</span>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="meter w-14">
+                                  <span className={`meter-fill ${confidenceTone(pct)}`} style={{ width: `${pct}%` }} />
+                                </span>
+                                <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">{pct}%</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="td text-right">
+                            {record.source?.url ? (
+                              <a
+                                href={record.source.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"
+                                title={record.source.url}
+                              >
+                                {hostOf(record.source.url)}
+                                <IconExternal size={12} />
+                              </a>
+                            ) : (
+                              <span className="text-xs text-slate-300 dark:text-slate-600">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
+
+            <Pagination
+              className="mt-4"
+              page={page}
+              totalPages={totalPages}
+              total={data.total}
+              unit="record"
+              onChange={setPage}
+              loading={loading}
+            />
           </>
         )}
       </div>
 
       {selected && (
         <div
-          className="fixed inset-0 bg-black/30 flex items-center justify-end z-20 animate-fade-in"
+          className="fixed inset-0 z-40 flex justify-end bg-slate-950/40 backdrop-blur-sm animate-fade-in"
           onClick={() => setSelected(null)}
+          role="presentation"
         >
-          <div
-            className="bg-white dark:bg-slate-900 h-full w-full max-w-md shadow-xl p-6 overflow-y-auto animate-slide-in"
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Record details"
+            className="scroll-thin flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-slate-200 bg-white shadow-pop animate-slide-in dark:border-slate-800 dark:bg-slate-900"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Record Details</h2>
-              <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors duration-150">
-                ✕
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+              <div className="min-w-0">
+                <p className="eyebrow">Record</p>
+                <h2 className="mt-1 text-sm font-semibold text-ink dark:text-white">Record Details</h2>
+                <p className="mt-0.5 font-mono text-[11px] text-slate-400 dark:text-slate-500">
+                  {selected.id.slice(0, 12)}…
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                className="btn-icon-sm"
+                aria-label="Close record details"
+              >
+                <IconX size={16} />
               </button>
             </div>
-            <dl className="mt-5 space-y-3 text-sm">
-              {Object.entries(selected.data).map(([key, value]) => (
-                <div key={key}>
-                  <dt className="text-xs text-slate-500 dark:text-slate-400 capitalize">{key.replace(/_/g, " ")}</dt>
-                  <dd className="mt-0.5">{value ?? <span className="text-slate-300 dark:text-slate-600">-</span>}</dd>
-                </div>
-              ))}
-              <div>
-                <dt className="text-xs text-slate-500 dark:text-slate-400">Validation</dt>
-                <dd className="mt-1"><StatusBadge status={selected.validationStatus} /></dd>
+
+            <div className="px-5 py-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge status={selected.validationStatus} />
+                {confidencePct(selected.confidence) !== null && (
+                  <span className="tag tabular-nums">Confidence {confidencePct(selected.confidence)}%</span>
+                )}
+                {selected.createdAt && (
+                  <span className="tag">Ingested {formatDateTime(selected.createdAt)}</span>
+                )}
               </div>
-              {selected.validationErrors && (
-                <div>
-                  <dt className="text-xs text-slate-500 dark:text-slate-400">Validation notes</dt>
-                  <dd className="mt-0.5 text-amber-700 dark:text-amber-400 text-xs space-y-0.5">
-                    {selected.validationErrors.map((e, i) => <p key={i}>{e}</p>)}
-                  </dd>
+
+              <dl className="mt-5 divide-y divide-slate-100 dark:divide-slate-800">
+                {Object.entries(selected.data).map(([key, value]) => (
+                  <div key={key} className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 py-2.5">
+                    <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">{titleCase(key)}</dt>
+                    <dd className="min-w-0 break-words text-sm text-ink dark:text-slate-100">
+                      {value ?? <span className="text-slate-300 dark:text-slate-600">—</span>}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+
+              {selected.validationErrors && selected.validationErrors.length > 0 && (
+                <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50/70 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/20">
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Validation notes</p>
+                  <ul className="mt-1.5 space-y-1 text-xs text-amber-700 dark:text-amber-400/90">
+                    {selected.validationErrors.map((e, i) => (
+                      <li key={i}>• {e}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
+
               {selected.source?.url && (
-                <div>
-                  <dt className="text-xs text-slate-500 dark:text-slate-400">Source</dt>
-                  <dd className="mt-0.5">
-                    <a href={selected.source.url} target="_blank" rel="noreferrer" className="text-accent hover:underline break-all">
-                      {selected.source.url}
-                    </a>
-                  </dd>
+                <div className="mt-5">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Provenance</p>
+                  <a
+                    href={selected.source.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1.5 flex items-start gap-2 rounded-lg border border-slate-200 p-3 text-xs text-accent transition-colors duration-150 hover:border-accent/40 hover:bg-accent/[0.04] dark:border-slate-700"
+                  >
+                    <IconExternal size={14} className="mt-0.5 shrink-0" />
+                    <span className="min-w-0 break-all">{selected.source.url}</span>
+                  </a>
                 </div>
               )}
-            </dl>
-          </div>
+            </div>
+          </aside>
         </div>
       )}
     </div>

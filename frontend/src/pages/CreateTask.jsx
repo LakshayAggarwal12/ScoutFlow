@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createTask } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
+import PageHeader from "../components/PageHeader.jsx";
+import { IconAlert, IconBrain, IconShield, IconSparkles, IconTarget } from "../components/icons.jsx";
 
 const EXAMPLE_PROMPTS = [
   {
@@ -23,6 +25,25 @@ const EXAMPLE_PROMPTS = [
   {
     label: "Internships",
     prompt: "Find 50 AI/ML internships in India posted in the last 7 days. Return company, role, location, stipend, posting date and application URL.",
+  },
+];
+
+// Short, factual notes about what happens after the task is created.
+const PIPELINE_NOTES = [
+  {
+    icon: IconBrain,
+    title: "Interpreted, not guessed",
+    desc: "The requirement becomes a structured spec of entity, fields, location, time window and quantity.",
+  },
+  {
+    icon: IconTarget,
+    title: "Planned, then executed",
+    desc: "A multi-step workflow of safe, predefined operations runs in the background.",
+  },
+  {
+    icon: IconShield,
+    title: "Verified and traceable",
+    desc: "Rows are deduplicated, validated and kept linked to their original source.",
   },
 ];
 
@@ -51,58 +72,134 @@ export default function CreateTask() {
   }
 
   return (
-    <div className="p-8 max-w-2xl animate-fade-in">
-      <h1 className="text-xl font-semibold">Create Task</h1>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-        Describe the data you need in plain language. The AI service will turn it into a structured
-        requirement and workflow, then run it in the background.
-      </p>
+    <div className="page page-md animate-fade-in">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Create Task"
+        description="Describe the data you need in plain language. The AI service will turn it into a structured requirement and workflow, then run it in the background."
+      />
 
-      <form onSubmit={handleSubmit} className="mt-6">
-        <textarea
-          className="input min-h-[140px] resize-y"
-          placeholder="Describe what data you need..."
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-        />
-        {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
-        <button type="submit" disabled={submitting || !prompt.trim()} className="btn-primary mt-3">
-          {submitting ? (
-            <>
-              <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              Creating...
-            </>
-          ) : (
-            "Create Task"
-          )}
-        </button>
-      </form>
+      <div className="mt-6 grid gap-6 lg:grid-cols-5">
+        {/* Composer */}
+        <form onSubmit={handleSubmit} className="card card-pad lg:col-span-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <label htmlFor="task-prompt" className="section-title">
+                Data requirement
+              </label>
+              <p className="section-sub">Be specific about entity, fields, quantity, location and time window.</p>
+            </div>
+            <span className="tag tabular-nums">{prompt.length} chars</span>
+          </div>
 
-      <div className="mt-8">
-        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-3">Try an example</p>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {EXAMPLE_PROMPTS.map((example) => (
-            <button
-              key={example.label}
-              onClick={() => setPrompt(example.prompt)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors duration-150 border ${
-                prompt === example.prompt
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-400 dark:hover:border-blue-500"
-              }`}
-            >
-              {example.label}
-            </button>
-          ))}
-        </div>
-        {EXAMPLE_PROMPTS.map((example) =>
-          prompt === example.prompt ? (
-            <p key={example.label} className="text-sm text-slate-600 dark:text-slate-300 card p-3 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-              {example.prompt}
+          <textarea
+            id="task-prompt"
+            className="textarea mt-4 min-h-[190px]"
+            placeholder="e.g. Find 30 remote backend engineering jobs posted in the last 7 days. Return company, role, location, salary and application URL."
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
+          />
+
+          {error && (
+            <p className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+              <IconAlert size={16} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
             </p>
-          ) : null
-        )}
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="hidden items-center gap-1.5 text-xs text-slate-400 sm:flex dark:text-slate-500">
+              <span className="kbd">Ctrl</span>
+              <span className="kbd">↵</span>
+              to submit
+            </p>
+            <div className="flex items-center gap-2">
+              {prompt && (
+                <button type="button" className="btn-ghost btn-sm" onClick={() => setPrompt("")} disabled={submitting}>
+                  Clear
+                </button>
+              )}
+              <button type="submit" disabled={submitting || !prompt.trim()} className="btn-primary">
+                {submitting ? (
+                  <>
+                    <span className="spinner" />
+                    Creating…
+                  </>
+                ) : (
+                  <>
+                    <IconSparkles size={16} />
+                    Create Task
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </form>
+
+        {/* Examples + context */}
+        <div className="space-y-4 lg:col-span-2">
+          <div className="card overflow-hidden">
+            <div className="panel-head">
+              <div>
+                <h2 className="section-title">Example requests</h2>
+                <p className="section-sub">Tap one to load it into the composer</p>
+              </div>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {EXAMPLE_PROMPTS.map((example) => {
+                const isActive = prompt === example.prompt;
+                return (
+                  <button
+                    key={example.label}
+                    type="button"
+                    onClick={() => setPrompt(example.prompt)}
+                    aria-pressed={isActive}
+                    className={`block w-full px-4 py-3 text-left transition-colors duration-150 ${
+                      isActive
+                        ? "bg-accent/[0.06] dark:bg-accent/10"
+                        : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                    }`}
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        {example.label}
+                      </span>
+                      {isActive && <span className="tag bg-accent/10 text-accent-700 dark:bg-accent/15 dark:text-accent-300">Loaded</span>}
+                    </span>
+                    <span className="mt-1.5 line-clamp-3 block text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                      {example.prompt}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="card card-pad">
+            <h2 className="section-title">What happens next</h2>
+            <ul className="mt-3 space-y-3.5">
+              {PIPELINE_NOTES.map(({ icon: Icon, title, desc }) => (
+                <li key={title} className="flex gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                    <Icon size={16} />
+                  </span>
+                  <div>
+                    <p className="text-[13px] font-medium text-ink dark:text-slate-100">{title}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+

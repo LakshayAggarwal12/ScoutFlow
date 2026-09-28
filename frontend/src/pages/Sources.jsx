@@ -2,11 +2,17 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listSources } from "../api/client.js";
 import StatusBadge from "../components/StatusBadge.jsx";
+import { statusLabel } from "../lib/status.js";
 import { SkeletonTable } from "../components/Skeleton.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import ErrorState from "../components/ErrorState.jsx";
+import PageHeader from "../components/PageHeader.jsx";
+import Pagination from "../components/Pagination.jsx";
+import { IconAlert, IconChevronRight, IconDatabase, IconExternal } from "../components/icons.jsx";
+import { formatDateTime, hostOf, pathOf, relativeTime } from "../lib/format.js";
 
 const PAGE_SIZE = 15;
+const STATUSES = ["", "COLLECTED", "FAILED", "PENDING"];
 
 export default function Sources() {
   const [status, setStatus] = useState("");
@@ -29,91 +35,126 @@ export default function Sources() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   return (
-    <div className="p-8 max-w-4xl animate-fade-in">
-      <h1 className="text-xl font-semibold">Sources</h1>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-        Provenance and collection health for every source across all tasks.
-      </p>
+    <div className="page page-lg animate-fade-in">
+      <PageHeader
+        eyebrow="Data"
+        title="Sources"
+        description="Provenance and collection health for every source across all tasks."
+        actions={
+          !loading && data ? (
+            <span className="tag tabular-nums">{data.total} {data.total === 1 ? "source" : "sources"}</span>
+          ) : null
+        }
+      />
 
-      <div className="mt-5 flex gap-3">
-        <select
-          className="input max-w-[180px]"
-          value={status}
-          onChange={(e) => {
-            setPage(1);
-            setStatus(e.target.value);
-          }}
-        >
-          <option value="">All statuses</option>
-          <option value="COLLECTED">Collected</option>
-          <option value="FAILED">Failed</option>
-          <option value="PENDING">Pending</option>
-        </select>
+      <div className="mt-6 flex flex-wrap items-center gap-1.5">
+        {STATUSES.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => {
+              setPage(1);
+              setStatus(s);
+            }}
+            className={`chip ${status === s ? "chip-active" : "chip-idle"}`}
+          >
+            {s ? statusLabel(s) : "All"}
+          </button>
+        ))}
       </div>
 
-      <div className="mt-5">
+      <div className="mt-4">
         {loading && <SkeletonTable rows={8} cols={4} />}
         {!loading && error && <ErrorState message={error} onRetry={load} />}
         {!loading && !error && data && data.items.length === 0 && (
-          <EmptyState title="No sources yet" description="Sources appear here once a task starts collecting." />
+          <EmptyState
+            icon={IconDatabase}
+            title="No sources yet"
+            description="Sources appear here once a task starts collecting."
+            action={
+              <Link to="/create" className="btn-primary">
+                Start a task
+                <IconChevronRight size={15} />
+              </Link>
+            }
+          />
         )}
         {!loading && !error && data && data.items.length > 0 && (
           <>
-            <div className="card overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-left text-xs text-slate-500 dark:text-slate-400">
-                    <th className="px-4 py-2.5 font-medium">URL</th>
-                    <th className="px-4 py-2.5 font-medium">Type</th>
-                    <th className="px-4 py-2.5 font-medium">Status</th>
-                    <th className="px-4 py-2.5 font-medium">Collected</th>
-                    <th className="px-4 py-2.5 font-medium">Task</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.items.map((s) => (
-                    <tr key={s.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0 row-hover">
-                      <td className="px-4 py-2.5 max-w-xs truncate">
-                        <a href={s.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
-                          {s.url}
-                        </a>
-                        {s.errorMessage && (
-                          <p className="text-xs text-red-500 mt-0.5 truncate">{s.errorMessage}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{s.type}</td>
-                      <td className="px-4 py-2.5">
-                        <StatusBadge status={s.status} />
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                        {new Date(s.createdAt).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <Link to={`/tasks/${s.taskId}`} className="text-accent hover:underline text-xs">
-                          View task
-                        </Link>
-                      </td>
+            <div className="card overflow-hidden">
+              <div className="table-scroll scroll-thin">
+                <table className="table">
+                  <thead>
+                    <tr className="thead-row">
+                      <th className="th">Source</th>
+                      <th className="th">Type</th>
+                      <th className="th">Status</th>
+                      <th className="th">Collected</th>
+                      <th className="th text-right">Task</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
-              <span>{data.total} source{data.total !== 1 ? "s" : ""}</span>
-              <div className="flex items-center gap-2">
-                <button className="btn-secondary px-3 py-1.5" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                  Prev
-                </button>
-                <span>Page {page} of {totalPages}</span>
-                <button className="btn-secondary px-3 py-1.5" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                  Next
-                </button>
+                  </thead>
+                  <tbody>
+                    {data.items.map((s) => (
+                      <tr key={s.id} className="tr">
+                        <td className="td max-w-sm">
+                          <a
+                            href={s.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="group inline-flex max-w-full items-center gap-1.5"
+                          >
+                            <span className="truncate font-medium text-accent group-hover:underline">
+                              {hostOf(s.url)}
+                            </span>
+                            <IconExternal size={13} className="shrink-0 text-slate-400" />
+                          </a>
+                          {pathOf(s.url) && (
+                            <p className="truncate font-mono text-[11px] text-slate-400 dark:text-slate-500">
+                              {pathOf(s.url)}
+                            </p>
+                          )}
+                          {s.errorMessage && (
+                            <p className="mt-1 flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400">
+                              <IconAlert size={13} className="mt-0.5 shrink-0" />
+                              <span className="line-clamp-2">{s.errorMessage}</span>
+                            </p>
+                          )}
+                        </td>
+                        <td className="td">
+                          <span className="tag">{s.type}</span>
+                        </td>
+                        <td className="td">
+                          <StatusBadge status={s.status} />
+                        </td>
+                        <td className="td whitespace-nowrap text-slate-500 dark:text-slate-400" title={formatDateTime(s.createdAt)}>
+                          {relativeTime(s.createdAt)}
+                        </td>
+                        <td className="td text-right">
+                          <Link to={`/tasks/${s.taskId}`} className="btn-ghost btn-xs">
+                            Open task
+                            <IconChevronRight size={13} />
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
+
+            <Pagination
+              className="mt-4"
+              page={page}
+              totalPages={totalPages}
+              total={data.total}
+              unit="source"
+              onChange={setPage}
+              loading={loading}
+            />
           </>
         )}
       </div>
     </div>
   );
 }
+

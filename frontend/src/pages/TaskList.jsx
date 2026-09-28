@@ -2,22 +2,21 @@ import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { listTasks, deleteTask } from "../api/client.js";
 import StatusBadge from "../components/StatusBadge.jsx";
+import { statusLabel } from "../lib/status.js";
 import { SkeletonList } from "../components/Skeleton.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import ErrorState from "../components/ErrorState.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import PageHeader from "../components/PageHeader.jsx";
+import Pagination from "../components/Pagination.jsx";
+import { IconChevronRight, IconSparkles, IconTasks, IconTrash } from "../components/icons.jsx";
 import { useToast } from "../context/ToastContext.jsx";
+import { formatNumber, relativeTime, shortId } from "../lib/format.js";
 
 const PAGE_SIZE = 20;
 const STATUSES = ["", "PLANNING", "QUEUED", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"];
 const ACTIVE = ["PLANNING", "QUEUED", "RUNNING"];
-
-function relativeTime(iso) {
-  const diff = Date.now() - new Date(iso).getTime();
-  if (diff < 60000) return "just now";
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-  return new Date(iso).toLocaleDateString();
-}
+const ROW_GRID = "md:grid md:grid-cols-[minmax(0,1fr)_140px_140px_170px] md:items-center md:gap-4";
 
 export default function TaskList() {
   const navigate = useNavigate();
@@ -26,6 +25,8 @@ export default function TaskList() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const { notify } = useToast();
 
   const load = useCallback(() => {
@@ -47,135 +48,178 @@ export default function TaskList() {
     return () => clearInterval(id);
   }, [data, load]);
 
-  async function handleDelete(e, taskId) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!window.confirm("Delete this task and all its data?")) return;
+  async function confirmDelete() {
+    setDeleting(true);
     try {
-      await deleteTask(taskId);
+      await deleteTask(pendingDelete.id);
       notify("Task deleted", "success");
+      setPendingDelete(null);
       load();
     } catch (err) {
       notify(err.response?.data?.error || err.message, "error");
+    } finally {
+      setDeleting(false);
     }
   }
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   return (
-    <div className="p-8 max-w-5xl animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">All Tasks</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            All your collection tasks and their status.
-          </p>
-        </div>
-        <Link to="/create" className="btn-primary">
-          + New Task
-        </Link>
-      </div>
+    <div className="page page-lg animate-fade-in">
+      <PageHeader
+        eyebrow="Workspace"
+        title="All Tasks"
+        description="All your collection tasks and their status."
+        actions={
+          <Link to="/create" className="btn-primary">
+            <IconSparkles size={16} />
+            New Task
+          </Link>
+        }
+      />
 
-      <div className="mt-5 flex gap-3 flex-wrap">
-        <div className="flex gap-1 flex-wrap">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
           {STATUSES.map((s) => (
             <button
               key={s}
-              onClick={() => { setPage(1); setStatus(s); }}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors duration-150 ${
-                status === s
-                  ? "bg-blue-600 text-white"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-              }`}
+              type="button"
+              onClick={() => {
+                setPage(1);
+                setStatus(s);
+              }}
+              className={`chip ${status === s ? "chip-active" : "chip-idle"}`}
             >
-              {s || "All"}
+              {s ? statusLabel(s) : "All"}
             </button>
           ))}
         </div>
+        {!loading && data && (
+          <span className="text-xs tabular-nums text-slate-400 dark:text-slate-500">
+            {formatNumber(data.total)} {data.total === 1 ? "task" : "tasks"}
+          </span>
+        )}
       </div>
 
-      <div className="mt-5">
+      <div className="mt-4">
         {loading && <SkeletonList rows={8} />}
         {!loading && error && <ErrorState message={error} onRetry={load} />}
         {!loading && !error && data?.items?.length === 0 && (
           <EmptyState
+            icon={IconTasks}
             title="No tasks found"
-            description={status ? `No tasks with status "${status}".` : "Create your first task to start collecting data."}
-            action={<Link to="/create" className="btn-primary">Create Task</Link>}
+            description={
+              status
+                ? `No tasks with status "${statusLabel(status)}".`
+                : "Create your first task to start collecting data."
+            }
+            action={
+              <Link to="/create" className="btn-primary">
+                <IconSparkles size={16} />
+                Create Task
+              </Link>
+            }
           />
         )}
         {!loading && !error && data?.items?.length > 0 && (
           <>
-            <div className="card divide-y divide-slate-100 dark:divide-slate-800">
-              {data.items.map((task) => (
-                <Link
-                  key={task.id}
-                  to={`/tasks/${task.id}`}
-                  className="flex items-start justify-between p-4 row-hover gap-4 group"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
-                      {task.prompt}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs text-slate-400 font-mono">{task.id.slice(0, 8)}…</span>
-                      <span className="text-xs text-slate-400">{relativeTime(task.createdAt)}</span>
-                      {task.retryCount > 0 && (
-                        <span className="text-xs text-slate-400">Run #{task.retryCount + 1}</span>
+            <div className="card overflow-hidden">
+              <div
+                className={`hidden border-b border-slate-200 bg-slate-50/80 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 md:grid md:grid-cols-[minmax(0,1fr)_140px_140px_170px] md:gap-4 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400`}
+              >
+                <span>Task</span>
+                <span>Status</span>
+                <span>Created</span>
+                <span className="text-right">Actions</span>
+              </div>
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {data.items.map((task) => (
+                  <Link
+                    key={task.id}
+                    to={`/tasks/${task.id}`}
+                    className={`group grid grid-cols-1 gap-3 px-5 py-4 row-hover ${ROW_GRID}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink dark:text-slate-100">{task.prompt}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 dark:text-slate-500">
+                        <span className="font-mono">{shortId(task.id)}…</span>
+                        {task.retryCount > 0 && <span className="tag">Run #{task.retryCount + 1}</span>}
+                        <span className="md:hidden">{relativeTime(task.createdAt)}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <StatusBadge status={task.status} />
+                    </div>
+
+                    <div className="hidden text-xs text-slate-500 md:block dark:text-slate-400">
+                      {relativeTime(task.createdAt)}
+                    </div>
+
+                    <div className="flex items-center gap-2 md:justify-end">
+                      {task.status === "COMPLETED" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            navigate(`/tasks/${task.id}/dataset`);
+                          }}
+                          className="btn-secondary btn-xs"
+                        >
+                          Dataset
+                          <IconChevronRight size={13} />
+                        </button>
+                      )}
+                      {!ACTIVE.includes(task.status) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setPendingDelete(task);
+                          }}
+                          className="btn-icon-sm opacity-0 hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100 dark:hover:text-red-400"
+                          title="Delete task"
+                          aria-label="Delete task"
+                        >
+                          <IconTrash size={15} />
+                        </button>
                       )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <StatusBadge status={task.status} />
-                    {task.status === "COMPLETED" && (
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          navigate(`/tasks/${task.id}/dataset`);
-                        }}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        Dataset →
-                      </button>
-                    )}
-                    {!ACTIVE.includes(task.status) && (
-                      <button
-                        onClick={(e) => handleDelete(e, task.id)}
-                        className="text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 p-1"
-                        title="Delete task"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                </Link>
-              ))}
-            </div>
-
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
-              <span>{data.total} task{data.total !== 1 ? "s" : ""}</span>
-              <div className="flex items-center gap-2">
-                <button
-                  className="btn-secondary px-3 py-1.5"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  Prev
-                </button>
-                <span>Page {page} of {totalPages}</span>
-                <button
-                  className="btn-secondary px-3 py-1.5"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </button>
+                  </Link>
+                ))}
               </div>
             </div>
+
+            <Pagination
+              className="mt-4"
+              page={page}
+              totalPages={totalPages}
+              total={data.total}
+              unit="task"
+              onChange={setPage}
+              loading={loading}
+            />
           </>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete this task?"
+        description={
+          pendingDelete
+            ? `"${pendingDelete.prompt}" and its dataset, sources and history will be permanently removed.`
+            : ""
+        }
+        confirmLabel="Delete"
+        danger
+        loading={deleting}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
+

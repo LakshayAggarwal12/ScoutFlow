@@ -1,6 +1,10 @@
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { Routes, Route, Navigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "./context/AuthContext.jsx";
+import { useTheme } from "./context/ThemeContext.jsx";
 import Sidebar from "./components/Sidebar.jsx";
+import Logo from "./components/Logo.jsx";
+import { IconMenu, IconMoon, IconSun } from "./components/icons.jsx";
 import Landing from "./pages/Landing.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
@@ -22,16 +26,43 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-function AppShell({ children }) {
+// Compact bar shown below the lg breakpoint, where the sidebar becomes a drawer.
+function MobileTopbar({ onOpenNav }) {
+  const { theme, toggleTheme } = useTheme();
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <main className="flex-1 overflow-x-hidden">
-        {children}
-      </main>
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/85 px-3 py-2.5 backdrop-blur lg:hidden dark:border-slate-800 dark:bg-slate-925/85">
+      <div className="flex min-w-0 items-center gap-2">
+        <button type="button" onClick={onOpenNav} className="btn-icon" aria-label="Open navigation">
+          <IconMenu size={18} />
+        </button>
+        <Link to="/dashboard" className="flex min-w-0 items-center gap-2">
+          <Logo size={24} />
+          <span className="truncate text-sm font-semibold tracking-tight text-ink dark:text-white">ScoutFlow</span>
+        </Link>
+      </div>
+      <button type="button" onClick={toggleTheme} className="btn-icon" aria-label="Toggle dark mode">
+        {theme === "dark" ? <IconSun size={17} /> : <IconMoon size={17} />}
+      </button>
+    </header>
+  );
+}
+
+function AppShell({ children }) {
+  // Each route renders its own AppShell, so navigating remounts it and resets
+  // the drawer to closed. Sidebar links additionally close it via onClose.
+  const [navOpen, setNavOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen lg:flex">
+      <Sidebar mobileOpen={navOpen} onClose={() => setNavOpen(false)} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <MobileTopbar onOpenNav={() => setNavOpen(true)} />
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
     </div>
   );
 }
+
 
 export default function App() {
   const { isAuthenticated } = useAuth();

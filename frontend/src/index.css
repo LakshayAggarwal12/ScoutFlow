@@ -5,49 +5,318 @@
 @layer base {
   html {
     @apply antialiased;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
-    @apply bg-slate-50 text-ink dark:bg-slate-925 dark:text-slate-100 transition-colors duration-200;
+    @apply bg-slate-50 text-ink transition-colors duration-200 dark:bg-slate-925 dark:text-slate-100;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
   }
   * {
     @apply border-slate-200 dark:border-slate-800;
   }
+  ::selection {
+    @apply bg-accent/20 text-ink dark:text-white;
+  }
+  /* Keyboard-only focus ring, scoped so form controls keep their own ring. */
+  :where(a, button, [role="button"], summary):focus-visible {
+    @apply outline-none ring-2 ring-accent/50 ring-offset-2 ring-offset-slate-50 dark:ring-offset-slate-925;
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    @apply accent-accent;
+  }
+  /* Thin, unobtrusive scrollbars on scrollable regions. */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(148 163 184 / 0.45) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background-color: rgb(148 163 184 / 0.45);
+    background-clip: content-box;
+    border: 3px solid transparent;
+    border-radius: 9999px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(100 116 139 / 0.65);
+  }
 }
 
 @layer components {
+  /* ------------------------------------------------------------------ */
+  /* Layout                                                             */
+  /* ------------------------------------------------------------------ */
+  .page {
+    @apply mx-auto w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8;
+  }
+  .page-sm {
+    @apply max-w-3xl;
+  }
+  .page-md {
+    @apply max-w-5xl;
+  }
+  .page-lg {
+    @apply max-w-6xl;
+  }
+  .page-full {
+    @apply max-w-none;
+  }
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500;
+  }
+  .page-title {
+    @apply text-[22px] font-semibold leading-tight tracking-tight text-ink sm:text-2xl dark:text-white;
+  }
+  .page-sub {
+    @apply mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-500 dark:text-slate-400;
+  }
+  .section-title {
+    @apply text-sm font-semibold tracking-tight text-ink dark:text-slate-100;
+  }
+  .section-sub {
+    @apply mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400;
+  }
+  .divider {
+    @apply h-px w-full bg-slate-200 dark:bg-slate-800;
+  }
+  .link {
+    @apply font-medium text-accent transition-colors duration-150 hover:text-accent-700 hover:underline dark:hover:text-accent-300;
+  }
+  .back-link {
+    @apply inline-flex items-center gap-1.5 text-[13px] font-medium text-slate-500 transition-colors duration-150 hover:text-ink dark:text-slate-400 dark:hover:text-white;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Surfaces                                                           */
+  /* ------------------------------------------------------------------ */
   .card {
-    @apply bg-white border border-slate-200 rounded-lg dark:bg-slate-900 dark:border-slate-800 transition-colors duration-200;
+    @apply rounded-xl border border-slate-200 bg-white shadow-card transition-colors duration-200 dark:border-slate-800 dark:bg-slate-900;
+  }
+  .card-pad {
+    @apply p-5 sm:p-6;
+  }
+  .card-hover {
+    @apply transition-all duration-200 hover:border-slate-300 hover:shadow-lifted dark:hover:border-slate-700;
+  }
+  .panel-head {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800;
+  }
+  .panel-body {
+    @apply p-5;
+  }
+  .panel-foot {
+    @apply flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-5 py-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Buttons                                                            */
+  /* ------------------------------------------------------------------ */
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium
+      transition-all duration-150 active:scale-[0.98]
+      disabled:pointer-events-none disabled:opacity-50 disabled:active:scale-100;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-md bg-ink text-white px-4 py-2 text-sm font-medium
-      hover:bg-slate-800 active:scale-[0.98] transition-all duration-150
-      disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
-      dark:bg-white dark:text-ink dark:hover:bg-slate-200;
+    @apply btn bg-ink px-4 py-2 text-white shadow-sm hover:bg-ink-800 dark:bg-white dark:text-ink dark:hover:bg-slate-200;
+  }
+  .btn-accent {
+    @apply btn bg-accent px-4 py-2 text-white shadow-sm hover:bg-accent-700;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white text-slate-700 px-4 py-2 text-sm font-medium
-      hover:bg-slate-50 hover:border-slate-400 active:scale-[0.98] transition-all duration-150
-      disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
-      dark:bg-slate-900 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-800;
+    @apply btn border border-slate-300 bg-white px-4 py-2 text-slate-700 shadow-sm
+      hover:border-slate-400 hover:bg-slate-50
+      dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800/70;
+  }
+  .btn-ghost {
+    @apply btn px-3 py-2 text-slate-600 hover:bg-slate-100 hover:text-ink dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white;
   }
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 text-red-700 px-4 py-2 text-sm font-medium
-      hover:bg-red-100 active:scale-[0.98] transition-all duration-150
-      disabled:opacity-50 disabled:cursor-not-allowed
-      dark:bg-red-950/40 dark:text-red-300 dark:border-red-900;
+    @apply btn border border-red-200 bg-red-50 px-4 py-2 text-red-700
+      hover:border-red-300 hover:bg-red-100
+      dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/60;
+  }
+  /* Size modifiers come after the variants so `btn-secondary btn-sm` actually
+     shrinks - equal specificity, so source order decides the winner. */
+  .btn-sm {
+    @apply px-3 py-1.5 text-[13px];
+  }
+  .btn-xs {
+    @apply gap-1.5 px-2.5 py-1 text-xs;
+  }
+  .btn-lg {
+    @apply px-5 py-2.5 text-[15px];
+  }
+  .btn-icon {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors duration-150
+      hover:bg-slate-100 hover:text-ink dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white;
+  }
+  .btn-icon-sm {
+    @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors duration-150
+      hover:bg-slate-100 hover:text-ink dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-white;
+  }
+  .spinner {
+    @apply inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent;
+  }
+  .spinner-lg {
+    @apply inline-block h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Forms                                                              */
+  /* ------------------------------------------------------------------ */
+  .label {
+    @apply mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-300;
+  }
+  .hint {
+    @apply mt-1.5 text-xs text-slate-500 dark:text-slate-400;
   }
   .input {
-    @apply w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white text-ink
-      focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-colors duration-150
-      dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder-slate-500;
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-ink shadow-sm
+      transition-colors duration-150 placeholder:text-slate-400
+      focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25
+      disabled:cursor-not-allowed disabled:bg-slate-50
+      dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-900/60;
   }
+  .input-sm {
+    @apply px-2.5 py-1.5 text-[13px];
+  }
+  .textarea {
+    @apply input resize-y leading-relaxed;
+  }
+  .select {
+    @apply input cursor-pointer appearance-none bg-no-repeat pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-position: right 0.55rem center;
+    background-size: 1rem 1rem;
+  }
+  .field-icon {
+    @apply pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500;
+  }
+
+  /* Auth screens are intentionally always dark - dedicated tokens. */
+  .auth-label {
+    @apply mb-1.5 block text-xs font-medium text-slate-300;
+  }
+  .auth-input {
+    @apply w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-sm text-white
+      placeholder:text-slate-500 transition-colors duration-150
+      focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/25;
+  }
+  .auth-btn {
+    @apply inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white
+      shadow-sm transition-all duration-150 hover:bg-accent-500 active:scale-[0.99]
+      disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100;
+  }
+  .auth-card {
+    @apply rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-pop backdrop-blur-sm sm:p-8;
+  }
+  .auth-alert {
+    @apply flex items-start gap-2.5 rounded-lg border border-red-900/70 bg-red-950/40 p-3 text-sm text-red-300;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Badges, chips, tags                                                */
+  /* ------------------------------------------------------------------ */
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors duration-150;
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold
+      tracking-wide transition-colors duration-150;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium
+      transition-all duration-150;
+  }
+  .chip-idle {
+    @apply border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50
+      dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800/70;
+  }
+  .chip-active {
+    @apply border-ink bg-ink text-white shadow-sm dark:border-white dark:bg-white dark:text-ink;
+  }
+  .tag {
+    @apply inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600
+      dark:bg-slate-800 dark:text-slate-300;
+  }
+  .kbd {
+    @apply rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-500
+      dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Tables                                                             */
+  /* ------------------------------------------------------------------ */
+  .table-scroll {
+    @apply w-full overflow-x-auto;
+  }
+  .table {
+    @apply w-full border-collapse text-sm;
+  }
+  .thead-row {
+    @apply border-b border-slate-200 bg-slate-50/80 text-left text-[11px] font-semibold uppercase tracking-wide
+      text-slate-500 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400;
+  }
+  .th {
+    @apply whitespace-nowrap px-4 py-3 font-semibold;
+  }
+  .td {
+    @apply px-4 py-3 align-middle;
+  }
+  .tr {
+    @apply border-b border-slate-100 transition-colors duration-150 last:border-0
+      hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-800/40;
   }
   .row-hover {
-    @apply transition-colors duration-150 hover:bg-slate-50 dark:hover:bg-slate-800/60;
+    @apply transition-colors duration-150 hover:bg-slate-50/80 dark:hover:bg-slate-800/50;
   }
+
+  /* ------------------------------------------------------------------ */
+  /* Stats & meters                                                     */
+  /* ------------------------------------------------------------------ */
+  .stat-tile {
+    @apply rounded-lg border border-slate-200 bg-white p-4 transition-colors duration-200 dark:border-slate-800 dark:bg-slate-900/60;
+  }
+  .stat-label {
+    @apply text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500;
+  }
+  .stat-value {
+    @apply mt-1 text-xl font-semibold tabular-nums tracking-tight text-ink dark:text-white;
+  }
+  .meter {
+    @apply h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800;
+  }
+  .meter-fill {
+    @apply h-full rounded-full transition-all duration-500;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Skeletons                                                          */
+  /* ------------------------------------------------------------------ */
   .skeleton {
-    @apply animate-pulse bg-slate-200 dark:bg-slate-800 rounded;
+    @apply relative overflow-hidden rounded-md bg-slate-200/80 dark:bg-slate-800/70;
+  }
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/60 to-transparent
+      dark:via-white/[0.05];
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Decorative                                                         */
+  /* ------------------------------------------------------------------ */
+  .grid-pattern {
+    background-image:
+      linear-gradient(to right, rgb(148 163 184 / 0.09) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(148 163 184 / 0.09) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+  .glow-accent {
+    background: radial-gradient(60% 60% at 50% 0%, rgb(47 111 237 / 0.28) 0%, transparent 70%);
   }
 }
+

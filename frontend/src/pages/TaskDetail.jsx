@@ -4,11 +4,40 @@ import { getTask, getLogs, cancelTask, runTask, getSourceHealth, deleteTask } fr
 import { useToast } from "../context/ToastContext.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import PipelineChecklist from "../components/PipelineChecklist.jsx";
+import MockDataBadge from "../components/MockDataBadge.jsx";
 import { SkeletonCard } from "../components/Skeleton.jsx";
 import ErrorState from "../components/ErrorState.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import PageHeader from "../components/PageHeader.jsx";
+import {
+  IconActivity,
+  IconArrowUpRight,
+  IconCopy,
+  IconLayers,
+  IconRefresh,
+  IconStop,
+  IconTable,
+  IconTerminal,
+  IconTrash,
+} from "../components/icons.jsx";
+import { formatNumber, formatTime, relativeTime, shortId } from "../lib/format.js";
 
 const ACTIVE_STATUSES = ["PLANNING", "QUEUED", "RUNNING"];
+
+// Log line severity → presentation colour.
+function logTone(status) {
+  if (status === "ERROR" || status === "FAILED") return "text-red-600 dark:text-red-400";
+  if (status === "RETRY_SCHEDULED") return "text-amber-600 dark:text-amber-400";
+  if (status === "RUNNING") return "text-accent-700 dark:text-accent-300";
+  return "text-slate-600 dark:text-slate-300";
+}
+
+function logDot(status) {
+  if (status === "ERROR" || status === "FAILED") return "bg-red-500";
+  if (status === "RETRY_SCHEDULED") return "bg-amber-500";
+  if (status === "RUNNING") return "bg-accent animate-pulse";
+  return "bg-emerald-500";
+}
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -80,55 +109,123 @@ export default function TaskDetail() {
     }
   }
 
-  if (error) return <div className="p-8"><ErrorState message={error} onRetry={refresh} /></div>;
-  if (!task) return <div className="p-8 max-w-4xl space-y-4"><SkeletonCard /><SkeletonCard /></div>;
+  async function copyRequirement() {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(task.structuredRequirement, null, 2));
+      notify("Requirement JSON copied", "success");
+    } catch {
+      notify("Copy failed - select the text manually", "error");
+    }
+  }
+
+  if (error) {
+    return (
+      <div className="page page-md animate-fade-in">
+        <ErrorState message={error} onRetry={refresh} />
+      </div>
+    );
+  }
+  if (!task) {
+    return (
+      <div className="page page-md animate-fade-in space-y-4">
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+    );
+  }
 
   const stats = logs.find((l) => l.step === "PIPELINE" && l.status === "COMPLETED")?.metadata;
   const isActive = ACTIVE_STATUSES.includes(task.status);
   const usedMockData = logs.some((l) => l.message?.includes("demo/mock data"));
+  const totalChecked = stats ? (stats.valid || 0) + (stats.partial || 0) + (stats.invalid || 0) : 0;
+  const pct = (value) => (totalChecked > 0 ? Math.round((value / totalChecked) * 100) : 0);
 
   return (
-    <div className="p-8 max-w-4xl animate-fade-in">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs text-slate-400 font-mono">{task.id}</p>
-          <h1 className="text-lg font-semibold mt-1 max-w-2xl">{task.prompt}</h1>
-          {task.retryCount > 0 && (
-            <p className="text-xs text-slate-400 mt-1">Rerun #{task.retryCount}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {usedMockData && <span className="badge bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">Mock data</span>}
-          <StatusBadge status={task.status} />
-        </div>
-      </div>
+    <div className="page page-md animate-fade-in">
+      <PageHeader
+        back={{ to: "/tasks", label: "All tasks" }}
+        meta={
+          <>
+            <span className="tag font-mono" title={task.id}>
+              {shortId(task.id, 10)}…
+            </span>
+            <span className="text-xs text-slate-400 dark:text-slate-500">
+              Created {relativeTime(task.createdAt)}
+            </span>
+            {task.retryCount > 0 && <span className="tag">Rerun #{task.retryCount}</span>}
+          </>
+        }
+        title={task.prompt}
+        actions={
+          <>
+            {usedMockData && <MockDataBadge />}
+            <StatusBadge status={task.status} />
+          </>
+        }
+      />
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        {isActive && (
+          <button className="btn-danger btn-sm" disabled={actionLoading || task.cancelRequested} onClick={handleCancel}>
+            {actionLoading === "cancel" || task.cancelRequested ? (
+              <>
+                <span className="spinner" />
+                Cancelling…
+              </>
+            ) : (
+              <>
+                <IconStop size={15} />
+                Cancel
+              </>
+            )}
+          </button>
+        )}
         {task.status === "FAILED" && (
-          <button className="btn-secondary" disabled={actionLoading} onClick={handleRetry}>
-            {actionLoading === "retry" ? "Retrying..." : "Retry"}
+          <button className="btn-secondary btn-sm" disabled={actionLoading} onClick={handleRetry}>
+            {actionLoading === "retry" ? (
+              <>
+                <span className="spinner" />
+                Retrying…
+              </>
+            ) : (
+              <>
+                <IconRefresh size={15} />
+                Retry
+              </>
+            )}
           </button>
         )}
         {task.status === "COMPLETED" && (
-          <button className="btn-secondary" disabled={actionLoading} onClick={handleRetry}>
-            {actionLoading === "retry" ? "Starting..." : "Rerun"}
+          <button className="btn-secondary btn-sm" disabled={actionLoading} onClick={handleRetry}>
+            {actionLoading === "retry" ? (
+              <>
+                <span className="spinner" />
+                Starting…
+              </>
+            ) : (
+              <>
+                <IconRefresh size={15} />
+                Rerun
+              </>
+            )}
           </button>
         )}
-        {isActive && (
-          <button className="btn-danger" disabled={actionLoading || task.cancelRequested} onClick={handleCancel}>
-            {task.cancelRequested ? "Cancelling..." : actionLoading === "cancel" ? "Cancelling..." : "Cancel"}
-          </button>
-        )}
-        <Link to={`/tasks/${id}/workflow`} className="btn-secondary">
+        <Link to={`/tasks/${id}/workflow`} className="btn-secondary btn-sm">
+          <IconLayers size={15} />
           View Workflow
         </Link>
         {task.status === "COMPLETED" && (
-          <Link to={`/tasks/${id}/dataset`} className="btn-primary">
+          <Link to={`/tasks/${id}/dataset`} className="btn-accent btn-sm">
+            <IconTable size={15} />
             View Dataset
           </Link>
         )}
         {!isActive && (
-          <button className="btn-danger ml-auto" onClick={() => setConfirmDelete(true)}>
+          <button
+            className="btn-ghost btn-sm ml-auto hover:text-red-600 dark:hover:text-red-400"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <IconTrash size={15} />
             Delete
           </button>
         )}
@@ -145,67 +242,171 @@ export default function TaskDetail() {
         onConfirm={handleDelete}
       />
 
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="card p-5">
-          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Pipeline</h2>
-          <PipelineChecklist logs={logs} taskStatus={task.status} />
-        </div>
+      <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+        <section className="card">
+          <div className="panel-head">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                <IconActivity size={16} />
+              </span>
+              <div>
+                <h2 className="section-title">Pipeline</h2>
+                <p className="section-sub">Stage-by-stage execution state</p>
+              </div>
+            </div>
+            {isActive && (
+              <span className="tag bg-accent/10 text-accent-700 dark:bg-accent/15 dark:text-accent-300">live</span>
+            )}
+          </div>
+          <div className="p-5">
+            <PipelineChecklist logs={logs} taskStatus={task.status} />
+          </div>
+        </section>
 
-        <div className="card p-5">
-          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Statistics</h2>
-          {stats ? (
-            <dl className="grid grid-cols-2 gap-y-3 text-sm">
-              <dt className="text-slate-500 dark:text-slate-400">Discovered</dt>
-              <dd className="text-right font-medium tabular-nums">{stats.discovered}</dd>
-              <dt className="text-slate-500 dark:text-slate-400">Valid</dt>
-              <dd className="text-right font-medium tabular-nums text-emerald-600 dark:text-emerald-400">{stats.valid}</dd>
-              <dt className="text-slate-500 dark:text-slate-400">Partial</dt>
-              <dd className="text-right font-medium tabular-nums text-amber-600 dark:text-amber-400">{stats.partial}</dd>
-              <dt className="text-slate-500 dark:text-slate-400">Invalid</dt>
-              <dd className="text-right font-medium tabular-nums text-red-600 dark:text-red-400">{stats.invalid}</dd>
-              <dt className="text-slate-500 dark:text-slate-400">Duplicates removed</dt>
-              <dd className="text-right font-medium tabular-nums">{stats.duplicates}</dd>
-              <dt className="text-slate-700 dark:text-slate-200 font-medium">Final records</dt>
-              <dd className="text-right font-semibold tabular-nums">{stats.final}</dd>
-              {sourceHealth && (
-                <>
-                  <dt className="text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800 mt-1">Source health</dt>
-                  <dd className="text-right pt-2 border-t border-slate-100 dark:border-slate-800 mt-1">
-                    <Link to="/sources" className="text-accent hover:underline text-xs">
-                      {Object.entries(sourceHealth).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(", ")}
-                    </Link>
-                  </dd>
-                </>
-              )}
-            </dl>
-          ) : (
-            <p className="text-sm text-slate-400">Statistics will appear once collection finishes.</p>
-          )}
-        </div>
+        <section className="card">
+          <div className="panel-head">
+            <div>
+              <h2 className="section-title">Statistics</h2>
+              <p className="section-sub">Record counts from the last completed run</p>
+            </div>
+            {sourceHealth && (
+              <Link to="/sources" className="btn-ghost btn-xs">
+                Source health
+                <IconArrowUpRight size={13} />
+              </Link>
+            )}
+          </div>
+
+          <div className="p-5">
+            {stats ? (
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <div className="stat-tile">
+                    <p className="stat-label">Discovered</p>
+                    <p className="stat-value">{formatNumber(stats.discovered)}</p>
+                  </div>
+                  <div className="stat-tile">
+                    <p className="stat-label">Valid</p>
+                    <p className="stat-value text-emerald-600 dark:text-emerald-400">{formatNumber(stats.valid)}</p>
+                  </div>
+                  <div className="stat-tile">
+                    <p className="stat-label">Partial</p>
+                    <p className="stat-value text-amber-600 dark:text-amber-400">{formatNumber(stats.partial)}</p>
+                  </div>
+                  <div className="stat-tile">
+                    <p className="stat-label">Invalid</p>
+                    <p className="stat-value text-red-600 dark:text-red-400">{formatNumber(stats.invalid)}</p>
+                  </div>
+                  <div className="stat-tile">
+                    <p className="stat-label">Duplicates</p>
+                    <p className="stat-value">{formatNumber(stats.duplicates)}</p>
+                  </div>
+                  <div className="stat-tile">
+                    <p className="stat-label">Final records</p>
+                    <p className="stat-value">{formatNumber(stats.final)}</p>
+                  </div>
+                </div>
+
+                {totalChecked > 0 && (
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                      <span>Validation mix</span>
+                      <span className="tabular-nums">{formatNumber(totalChecked)} checked</span>
+                    </div>
+                    <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      <span className="bg-emerald-500" style={{ width: `${pct(stats.valid || 0)}%` }} />
+                      <span className="bg-amber-500" style={{ width: `${pct(stats.partial || 0)}%` }} />
+                      <span className="bg-red-500" style={{ width: `${pct(stats.invalid || 0)}%` }} />
+                    </div>
+                    <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" /> Valid {pct(stats.valid || 0)}%
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-amber-500" /> Partial {pct(stats.partial || 0)}%
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-red-500" /> Invalid {pct(stats.invalid || 0)}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-2 py-8 text-center">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                  <IconActivity size={18} />
+                </span>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Statistics will appear once collection finishes.
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
       {task.structuredRequirement && (
-        <div className="mt-6 card p-5">
-          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">Structured Requirement</h2>
-          <pre className="text-xs bg-slate-50 dark:bg-slate-950 rounded-md p-3 overflow-x-auto">
-            {JSON.stringify(task.structuredRequirement, null, 2)}
-          </pre>
-        </div>
+        <section className="card mt-6">
+          <div className="panel-head">
+            <div>
+              <h2 className="section-title">Structured Requirement</h2>
+              <p className="section-sub">The specification the AI extracted from your prompt</p>
+            </div>
+            <button type="button" className="btn-secondary btn-xs" onClick={copyRequirement}>
+              <IconCopy size={13} />
+              Copy JSON
+            </button>
+          </div>
+          <div className="p-5">
+            <pre className="scroll-thin max-h-80 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+              {JSON.stringify(task.structuredRequirement, null, 2)}
+            </pre>
+          </div>
+        </section>
       )}
 
-      <div className="mt-6 card p-5">
-        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">Execution Log</h2>
-        <div className="space-y-1.5 max-h-72 overflow-y-auto">
-          {logs.map((log) => (
-            <div key={log.id} className="flex items-baseline gap-3 text-xs">
-              <span className="text-slate-400 font-mono w-24 shrink-0">{log.step}</span>
-              <span className={log.status === "ERROR" || log.status === "FAILED" ? "text-red-600 dark:text-red-400" : log.status === "RETRY_SCHEDULED" ? "text-amber-600 dark:text-amber-400" : "text-slate-600 dark:text-slate-300"}>
-                {log.message}
-              </span>
+      <section className="card mt-6">
+        <div className="panel-head">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+              <IconTerminal size={16} />
+            </span>
+            <div>
+              <h2 className="section-title">Execution Log</h2>
+              <p className="section-sub">Raw step-by-step messages from the worker</p>
             </div>
-          ))}
+          </div>
+          <span className="tag tabular-nums">{logs.length} entries</span>
         </div>
-      </div>
+        <div className="scroll-thin max-h-80 overflow-y-auto p-2">
+          {logs.length === 0 ? (
+            <p className="p-3 text-sm text-slate-500 dark:text-slate-400">No log entries yet.</p>
+          ) : (
+            <ul className="space-y-0.5">
+              {logs.map((log) => (
+                <li
+                  key={log.id}
+                  className="flex items-start gap-3 rounded-md px-3 py-2 transition-colors duration-150 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                >
+                  <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${logDot(log.status)}`} />
+                  <span className="w-28 shrink-0 truncate font-mono text-[11px] uppercase text-slate-400 dark:text-slate-500">
+                    {log.step}
+                  </span>
+                  <span className={`min-w-0 flex-1 text-xs leading-relaxed ${logTone(log.status)}`}>
+                    {log.message}
+                  </span>
+                  {log.createdAt && (
+                    <span className="hidden shrink-0 font-mono text-[11px] tabular-nums text-slate-400 sm:block dark:text-slate-500">
+                      {formatTime(log.createdAt)}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
