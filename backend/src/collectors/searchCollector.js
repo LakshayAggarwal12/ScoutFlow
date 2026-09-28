@@ -78,7 +78,17 @@ export async function searchSources(queries, { limit = 20, maxQueries = env.sear
         const key = item.link.replace(/[#?].*$/, "");
         if (seen.has(key)) continue;
         seen.add(key);
-        results.push({ url: item.link, title: item.title });
+        // Keep Serper's snippet + title: they often already contain the field
+        // values (names, locations, funding) and are the only readable signal
+        // when the page itself is JS-walled or fetch fails. Downstream
+        // collection/extraction uses them as supplementary context.
+        results.push({
+          url: item.link,
+          title: item.title || "",
+          snippet: item.snippet || "",
+          source: item.source || "",
+          date: item.date || "",
+        });
       }
     }
   }

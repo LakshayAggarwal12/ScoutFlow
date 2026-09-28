@@ -74,7 +74,27 @@ async def extract(raw_content: str, fields: list) -> list:
         try:
             # Prototype default 6000 chars ≈ 2k tokens/req (vs ~4k at 12000),
             # doubling throughput on the 8000 TPM free tier.
-            user_content = json.dumps({"fields": fields, "content": raw_content[:LLM_EXTRACT_WINDOW]})
+            # Keep the search-context header AND the tail: the header names the
+            # entities (often enough to fill a record on its own) while the
+            # body holds the per-entity details. A single head-slice used to
+            # keep only boilerplate and truncate the entities away.
+            window = LLM_EXTRACT_WINDOW
+            text = raw_content or ""
+            head, sep, tail = text.partition("--- Page content below ---")
+            if sep:
+                header = head.strip()[:1500]
+                body = tail.strip()
+                # Header always survives; body gets whatever budget is left.
+                # If the body still overflows, keep its head AND tail (lead
+                # listings + trailing details) instead of head-only.
+                body_budget = max(1000, window - len(header) - 100)
+                if len(body) > body_budget:
+                    half = body_budget // 2
+                    body = body[:half] + "\n...\n" + body[-half:]
+                content = f"{header}\n{sep}\n{body}"[:window]
+            else:
+                content = text[:window]
+            user_content = json.dumps({"fields": fields, "content": content})
             raw = await asyncio.to_thread(complete_json, EXTRACTION_SYSTEM_PROMPT, user_content)
             data = json.loads(_strip_fences(raw))
             records = _coerce_records(data, fields)

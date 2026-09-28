@@ -48,17 +48,37 @@ export async function collectSources(taskId, structuredRequirement) {
     });
 
     const fetched = await mapWithConcurrency(candidateUrls, env.fetchConcurrency, (candidate) =>
-      collectFromUrl(candidate.url)
+      collectFromUrl(candidate.url, {
+        fallbackContext: { title: candidate.title, snippet: candidate.snippet, date: candidate.date },
+      })
     );
     fetched.forEach((result, idx) => {
       if (result.status === "fulfilled") {
         attempts.push({ item: result.value, ok: true });
       } else {
-        attempts.push({
-          item: { sourceUrl: candidateUrls[idx].url, sourceType: "http" },
-          ok: false,
-          error: result.reason?.message,
-        });
+        // Fetch failed (JS wall / bot wall / timeout) but Serper's snippet
+        // often already names the entities - keep it as a minimal source so
+        // extraction can still read SOMETHING instead of dropping the URL.
+        const candidate = candidateUrls[idx];
+        const snippet = (candidate.snippet || "").trim();
+        const title = (candidate.title || "").trim();
+        if (snippet.length >= 80 || title.length >= 10) {
+          const headerParts = [];
+          if (title) headerParts.push(`Search result title: ${title}`);
+          if (snippet) headerParts.push(`Search snippet: ${snippet}`);
+          if (candidate.date) headerParts.push(`Published: ${candidate.date}`);
+          headerParts.push(`Source page: ${candidate.url} (full page could not be fetched: ${result.reason?.message || "fetch failed"}; extracting from search snippet)`);
+          attempts.push({
+            item: { sourceUrl: candidate.url, sourceType: "search-snippet", rawContent: headerParts.join("\n") },
+            ok: true,
+          });
+        } else {
+          attempts.push({
+            item: { sourceUrl: candidate.url, sourceType: "http" },
+            ok: false,
+            error: result.reason?.message,
+          });
+        }
       }
     });
   } catch (err) {
