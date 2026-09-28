@@ -1,26 +1,47 @@
 import axios from "axios";
-import { env } from "../config/env.js";
+import * as cheerio from "cheerio";
 
 // Collector B - Search/API Collector.
-// Behind a small provider interface so a real search/jobs API can be
-// swapped in later via environment variables without touching callers.
+// Scrapes DuckDuckGo HTML version to freely find relevant URLs for ANY task,
+// bypassing the need for paid Search API keys (SerpApi/Google).
 export async function searchSources(query, { limit = 10 } = {}) {
-  const provider = process.env.SEARCH_PROVIDER;
-  const apiKey = process.env.SEARCH_API_KEY;
+  try {
+    const response = await axios.get("https://html.duckduckgo.com/html/", {
+      params: { q: query },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      timeout: 10000,
+    });
 
-  if (!provider || !apiKey) {
-    // No provider configured - the workflow engine falls back to the
-    // demo collector for the prototype. This keeps the interface real
-    // (same call shape) without requiring paid credentials to run.
+    const $ = cheerio.load(response.data);
+    const results = [];
+
+    // Parse the classic DDG HTML layout
+    $(".result__a").each((i, el) => {
+      if (results.length >= limit) return;
+
+      const href = $(el).attr("href");
+      const title = $(el).text();
+
+      let finalUrl = href;
+      // DDG sometimes uses a redirect wrapper: //duckduckgo.com/l/?uddg=https%3A%2F%2F...
+      if (href && href.includes("uddg=")) {
+        const urlParam = href.split("uddg=")[1]?.split("&")[0];
+        if (urlParam) {
+          finalUrl = decodeURIComponent(urlParam);
+        }
+      }
+
+      if (finalUrl && finalUrl.startsWith("http")) {
+        results.push({ url: finalUrl, title: title.trim() });
+      }
+    });
+
+    return results;
+  } catch (error) {
+    console.error(`DuckDuckGo search failed for query "${query}":`, error.message);
     return [];
   }
-
-  // Example shape for a generic provider; adapt per real API.
-  const response = await axios.get(provider, {
-    params: { q: query, limit },
-    headers: { Authorization: `Bearer ${apiKey}` },
-    timeout: 8000,
-  });
-
-  return (response.data?.results || []).map((r) => ({ url: r.url, title: r.title }));
 }

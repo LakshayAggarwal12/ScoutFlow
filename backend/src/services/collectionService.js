@@ -19,12 +19,14 @@ export async function collectSources(taskId, structuredRequirement) {
   const attempts = [];
 
   // Real collector 1: public jobs API, no credentials required.
-  try {
-    const remotiveItems = await collectFromRemotive(structuredRequirement);
-    remotiveItems.forEach((item) => attempts.push({ item, ok: true }));
-    await logStep(taskId, "COLLECTION", "RUNNING", `Remotive API returned ${remotiveItems.length} sources`);
-  } catch (err) {
-    await logStep(taskId, "COLLECTION", "ERROR", `Remotive collector failed: ${err.message}`);
+  if (structuredRequirement.entity === "job") {
+    try {
+      const remotiveItems = await collectFromRemotive(structuredRequirement);
+      remotiveItems.forEach((item) => attempts.push({ item, ok: true }));
+      await logStep(taskId, "COLLECTION", "RUNNING", `Remotive API returned ${remotiveItems.length} sources`);
+    } catch (err) {
+      await logStep(taskId, "COLLECTION", "ERROR", `Remotive collector failed: ${err.message}`);
+    }
   }
 
   // Real collector 2: configured search provider (behind an interface -
