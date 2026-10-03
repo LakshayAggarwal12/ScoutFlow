@@ -20,11 +20,11 @@ export function validateRecord(data, requestedFields = []) {
     const value = data[field];
     const missing = value === null || value === undefined || value === "";
 
-    // URL fields — validate format if present, flag if missing
+    // URL fields — only error when a value IS present but malformed.
+    // A missing URL (null / empty) is NOT an error: the apply link is often
+    // behind a login wall and simply doesn't exist on the scraped page.
     if (field.endsWith("_url") || field === "url" || field === "website" || field === "link") {
-      if (missing) {
-        errors.push(`${field} was requested but could not be extracted`);
-      } else if (!isValidUrl(value)) {
+      if (!missing && !isValidUrl(value)) {
         errors.push(`${field} is not a valid URL`);
       }
       continue;
@@ -46,15 +46,22 @@ export function validateRecord(data, requestedFields = []) {
     }
   }
 
-  // Scoring: critical = URL format errors or >50% of fields missing
+  // Scoring:
+  //   INVALID  — any URL is present-but-malformed, OR >50% of fields are missing
+  //   PARTIAL  — some fields missing but fill rate is between 30% and 100%
+  //              (previously ANY single missing field → PARTIAL; now threshold
+  //               is 70% fill rate so a 4/5-field record counts as VALID)
+  //   VALID    — no errors, OR fill rate >= 70% with no malformed URLs
   const urlFormatErrors = errors.filter((e) => e.includes("not a valid URL")).length;
-  const missingCount = errors.filter((e) => e.includes("could not be extracted") || e.includes("but missing")).length;
+  const missingCount = errors.filter((e) => e.includes("could not be extracted")).length;
   const totalRequested = requestedFields.length || 1;
+  const fillRate = (totalRequested - missingCount) / totalRequested;
 
   let status = "VALID";
   if (urlFormatErrors > 0 || missingCount / totalRequested > 0.5) {
     status = "INVALID";
-  } else if (errors.length > 0) {
+  } else if (fillRate < 0.7) {
+    // Less than 70% of fields filled → PARTIAL
     status = "PARTIAL";
   }
 
